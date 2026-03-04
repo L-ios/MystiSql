@@ -1,0 +1,840 @@
+# MystiSql
+
+## 问题
+- 在一个k8s集群中，有多个数据库实例，其中包含mysql，postgresql，oracle等数据库，但是实例是无法通过外部进行访问，只能在k8s集群内部进行访问。
+- 开发场景下，开发人员无法在自己的主机上，直接访问k8s集群中的数据库实例，即使在k8s集群中，也需要额外的引入不同数据库的cli客户端，在数据库pod中执行才能访问
+- 运维场景下，运维人员无法在自己的主机上，直接访问k8s集群中的数据库实例，集群中由于安全问题，无法引入不同数据库的cli客户端，也导致无法在数据库pod中执行命令
+
+## MystiSql 定位
+- MystiSql 是一个数据库工具，为了方便开发人员和运维人员对一个k8s集群中的所有数据库进行操作。
+- MystiSql 提供两种模式，分别是cli和webui，默认为cli模式
+- MystiSql 的webui，使用restful的形式提供数据库查询和操作的接口，同时也提供一个websocket接口，方便使用者操作数据库，同时也提供一个webui界面，方便使用者进行操作。
+- MystiSql 的cli模式，提供一个命令行界面，使用者在k8s集群中进行数据库查询和操作，cli模式也可以通过 MystiSqlti提供的restful接口进行操作。
+- MystiSql 还需要提供一个jdbc驱动，方便开发人员在自己的主机上，直接访问k8s集群中的数据库实例。
+
+## 核心价值
+
+| 痛点场景 | 传统方案的局限 | MystiSql的突破 |
+|---------|--------------|---------------|
+| 开发调试 | 需要port-forward或VPN，配置复杂 | 统一入口，一次配置，随处访问 |
+| 运维巡检 | 需要在Pod内安装各数据库CLI | WebUI/CLI双模式，零依赖访问 |
+| 安全合规 | 直接暴露数据库端口有风险 | 集中管控，审计日志，权限控制 |
+| 多数据库 | 每种数据库需要不同的客户端工具 | 统一接口，屏蔽差异 |
+
+## 架构设计
+
+### 整体架构
+
+> 架构层次从下往上：数据库实例 → 服务发现 → 连接层 → 服务层 → 接入层
+
+#### Mermaid 版本
+
+```mermaid
+flowchart BT
+    subgraph DBLayer[数据库实例层 Database Layer]
+        direction LR
+        D1[(MySQL Master)]
+        D2[(MySQL Slave)]
+        D3[(PostgreSQL)]
+        D4[(Oracle)]
+        D5[(Redis)]
+    end
+
+    subgraph K8sLayer[服务发现层 Discovery Layer]
+        K1[Instance Discoverer<br/>K8s API / Config / Static]
+    end
+
+    subgraph ConnectionLayer[连接层 Connection Layer]
+        direction LR
+        C1[MySQL Driver<br/>go-sql-driver]
+        C2[PostgreSQL Driver<br/>pgx]
+        C3[Oracle Driver<br/>go-ora]
+        C4[Redis Driver<br/>go-redis]
+    end
+
+    subgraph ServiceLayer[服务层 Service Layer]
+        direction TB
+        subgraph CoreGroup[核心引擎]
+            S1[Query Engine<br/>SQL解析路由]
+            S4[Schema Cache<br/>元数据缓存]
+        end
+        subgraph SecurityGroup[安全控制]
+            S2[Auth Module<br/>RBAC权限]
+            S3[Audit Logger<br/>操作审计]
+            S5[SQL Validator<br/>安全检查]
+            S7[Data Masking<br/>数据脱敏]
+        end
+        subgraph SupportGroup[支撑服务]
+            S6[Result Formatter<br/>格式化]
+            S8[Health Monitor<br/>健康监控]
+        end
+    end
+
+    subgraph AccessLayer[接入层 Access Layer]
+        direction LR
+        A1[RESTful API<br/>标准HTTP]
+        A2[WebSocket<br/>实时交互]
+        A3[JDBC Driver<br/>Java生态]
+        A4[CLI Tool<br/>终端操作]
+    end
+
+    DBLayer --> K8sLayer
+    K8sLayer --> ConnectionLayer
+    ConnectionLayer --> CoreGroup
+    CoreGroup --> SecurityGroup
+    SecurityGroup --> SupportGroup
+    SupportGroup --> AccessLayer
+```
+
+#### PlantUML 版本
+
+```plantuml
+@startuml MystiSql架构图
+!define RECTANGLE class
+
+database "数据库实例层 Database Layer" as DBLayer <<Rectangle>> {
+    database "MySQL Master" as D1
+    database "MySQL Slave" as D2
+    database "PostgreSQL" as D3
+    database "Oracle" as D4
+    database "Redis" as D5
+}
+
+package "服务发现层 Discovery Layer" as K8sLayer <<Rectangle>> {
+    [Instance Discoverer\nK8s API / Config / Static] as K1
+}
+
+package "连接层 Connection Layer" as ConnectionLayer <<Rectangle>> {
+    [MySQL Driver\ngo-sql-driver] as C1
+    [PostgreSQL Driver\npgx] as C2
+    [Oracle Driver\ngo-ora] as C3
+    [Redis Driver\ngo-redis] as C4
+}
+
+package "服务层 Service Layer" as ServiceLayer <<Rectangle>> {
+    package "核心引擎" as CoreGroup {
+        [Query Engine\nSQL解析路由] as S1
+        [Schema Cache\n元数据缓存] as S4
+    }
+    
+    package "安全控制" as SecurityGroup {
+        [Auth Module\nRBAC权限] as S2
+        [Audit Logger\n操作审计] as S3
+        [SQL Validator\n安全检查] as S5
+        [Data Masking\n数据脱敏] as S7
+    }
+    
+    package "支撑服务" as SupportGroup {
+        [Result Formatter\n格式化] as S6
+        [Health Monitor\n健康监控] as S8
+    }
+}
+
+package "接入层 Access Layer" as AccessLayer <<Rectangle>> {
+    [RESTful API\n标准HTTP] as A1
+    [WebSocket\n实时交互] as A2
+    [JDBC Driver\nJava生态] as A3
+    [CLI Tool\n终端操作] as A4
+}
+
+DBLayer --> K8sLayer : 实例注册
+K8sLayer --> ConnectionLayer : 服务发现
+ConnectionLayer --> CoreGroup : 连接建立
+CoreGroup --> SecurityGroup : 安全检查
+SecurityGroup --> SupportGroup : 结果处理
+SupportGroup --> AccessLayer : 响应输出
+
+@enduml
+```
+
+### 模块详解
+
+> 模块从底层到上层依次介绍，体现依赖关系
+
+#### 1. 数据库实例层 (Database Layer)
+
+最底层，实际的数据库实例：
+- MySQL（主库/从库）
+- PostgreSQL
+- Oracle
+- Redis
+
+#### 2. 服务发现层 (Discovery Layer)
+
+负责发现和管理数据库实例信息：
+
+**功能列表（从低级到高级）**
+
+| 功能 | 级别 | 说明 |
+|-----|------|------|
+| 实例注册 | 基础 | 数据库实例信息录入 |
+| 实例发现 | 基础 | 支持K8s API / 配置文件 / 静态配置 / 服务注册中心 |
+| 状态监控 | 中级 | 实例健康状态检查 |
+| 动态感知 | 高级 | 实例增删改的实时通知 |
+
+**发现接口设计**
+
+```mermaid
+flowchart LR
+    subgraph Discovery[Instance Discovery Interface]
+        D[InstanceDiscoverer<br/>统一发现接口]
+    end
+    
+    subgraph Providers[发现提供者]
+        P1[K8s API Discoverer<br/>动态发现]
+        P2[Config File Discoverer<br/>配置文件]
+        P3[Static Discoverer<br/>静态配置]
+        P4[Consul Discoverer<br/>服务注册中心]
+    end
+    
+    subgraph Registry[实例注册中心]
+        R[Instance Registry<br/>实例缓存与状态管理]
+    end
+    
+    P1 --> D
+    P2 --> D
+    P3 --> D
+    P4 --> D
+    D --> R
+```
+
+**发现模式详解**
+
+| 模式 | 说明 | 适用场景 |
+|-----|------|---------|
+| **K8s API动态发现** | 通过client-go监听Service/Pod变化，自动发现带特定Label的数据库实例 | K8s原生环境，实例动态变化 |
+| **配置文件发现** | 从ConfigMap/配置文件读取数据库实例列表 | 实例相对固定，需要精细控制 |
+| **静态配置发现** | 启动参数或环境变量指定实例 | 单实例或少量实例，快速部署 |
+| **服务注册中心发现** | 从Consul/Nacos等注册中心获取实例 | 多集群、混合云环境 |
+
+**接口定义（Go伪代码）**
+
+```go
+type InstanceDiscoverer interface {
+    Name() string
+    Discover(ctx context.Context) ([]*DatabaseInstance, error)
+    Watch(ctx context.Context) (<-chan DiscoveryEvent, error)
+    Stop() error
+}
+
+type DatabaseInstance struct {
+    Name        string
+    Type        DatabaseType
+    Host        string
+    Port        int
+    Labels      map[string]string
+    Annotations map[string]string
+    Status      InstanceStatus
+}
+
+type DiscoveryEvent struct {
+    Type     EventType
+    Instance *DatabaseInstance
+}
+```
+
+**配置示例**
+
+```yaml
+discovery:
+  k8s:
+    enabled: true
+    namespaces: [default, production, staging]
+    selectors:
+      - labelSelector: "app=mysql,environment=production"
+        type: mysql
+      - labelSelector: "app=postgresql"
+        type: postgresql
+    portMapping:
+      mysql: 3306
+      postgresql: 5432
+      oracle: 1521
+      
+  config:
+    enabled: true
+    sources:
+      - configMap:
+          name: mystisql-instances
+          namespace: mystisql
+      - file:
+          path: /etc/mystisql/instances.yaml
+          
+  static:
+    enabled: false
+    instances:
+      - name: local-mysql
+        type: mysql
+        host: localhost
+        port: 3306
+```
+
+#### 3. 连接层 (Connection Layer)
+
+负责与数据库建立和维护连接：
+
+**功能列表（从低级到高级）**
+
+| 功能 | 级别 | 说明 |
+|-----|------|------|
+| 驱动适配 | 基础 | MySQL/PostgreSQL/Oracle/Redis驱动封装 |
+| 连接建立 | 基础 | 创建数据库连接 |
+| 连接池管理 | 中级 | 连接复用，避免频繁建立连接 |
+| 健康检查 | 中级 | 连接可用性检测，自动重连 |
+| 读写分离 | 高级 | 自动识别主从，路由读写请求 |
+| 主从切换感知 | 高级 | 感知主从切换，自动更新路由 |
+
+**多数据库驱动支持**
+
+| 数据库 | 驱动 | 说明 |
+|-------|------|------|
+| MySQL | go-sql-driver/mysql | 官方推荐 |
+| PostgreSQL | pgx | 高性能驱动 |
+| Oracle | go-ora | 纯Go实现 |
+| Redis | go-redis | 官方推荐 |
+
+#### 4. 服务层 (Service Layer)
+
+核心业务逻辑处理，按功能分组：
+
+##### 4.1 核心引擎（基础功能）
+
+**Query Engine (查询引擎)**
+
+| 功能 | 级别 | 说明 |
+|-----|------|------|
+| SQL解析 | 基础 | 解析SQL语句结构 |
+| SQL路由 | 基础 | 根据实例名路由到对应数据库 |
+| 查询超时控制 | 中级 | 防止长时间运行的查询 |
+| 结果集大小限制 | 中级 | 防止返回过多数据 |
+| 智能读写分离 | 高级 | 自动识别读写请求，路由到主库/从库 |
+
+**Schema Cache (元数据缓存)**
+
+| 功能 | 级别 | 说明 |
+|-----|------|------|
+| 表结构缓存 | 基础 | 缓存表结构信息 |
+| 索引信息缓存 | 中级 | 缓存索引信息，辅助优化 |
+| 缓存失效策略 | 高级 | 表结构变更时自动刷新缓存 |
+
+##### 4.2 安全控制（中级功能）
+
+**Auth Module (认证授权)**
+
+| 功能 | 级别 | 说明 |
+|-----|------|------|
+| Token认证 | 基础 | 简单的Token验证 |
+| K8s ServiceAccount集成 | 中级 | 集成K8s原生认证 |
+| OIDC/LDAP集成 | 中级 | 企业级认证集成 |
+| RBAC权限模型 | 高级 | 库级别、表级别、操作级别权限控制 |
+
+**Audit Logger (审计日志)**
+
+| 功能 | 级别 | 说明 |
+|-----|------|------|
+| SQL执行记录 | 基础 | 记录执行的SQL语句 |
+| 操作者信息 | 基础 | 记录谁执行了操作 |
+| 敏感操作告警 | 中级 | DROP/TRUNCATE等危险操作告警 |
+| 全量审计日志 | 高级 | 完整的操作审计链路 |
+
+**SQL Validator (SQL安全检查)**
+
+| 功能 | 级别 | 说明 |
+|-----|------|------|
+| 危险操作检测 | 基础 | 检测DROP、TRUNCATE等危险操作 |
+| SQL白名单/黑名单 | 中级 | 配置允许/禁止的SQL模式 |
+| 注入攻击防护 | 高级 | 检测并拦截SQL注入攻击 |
+
+**Data Masking (数据脱敏)**
+
+| 功能 | 级别 | 说明 |
+|-----|------|------|
+| 敏感字段识别 | 基础 | 识别手机号、身份证等敏感字段 |
+| 规则脱敏 | 中级 | 按规则进行数据脱敏 |
+| 基于角色的脱敏策略 | 高级 | 不同角色看到不同程度的脱敏数据 |
+
+##### 4.3 支撑服务（高级功能）
+
+**Result Formatter (结果格式化)**
+
+| 功能 | 级别 | 说明 |
+|-----|------|------|
+| 基础格式化 | 基础 | 表格、JSON、CSV格式输出 |
+| 分页处理 | 中级 | 大结果集分页返回 |
+| 导出功能 | 高级 | 导出为Excel、SQL等格式 |
+
+**Health Monitor (健康监控)**
+
+| 功能 | 级别 | 说明 |
+|-----|------|------|
+| 连接数监控 | 基础 | 监控数据库连接数 |
+| 慢查询捕获 | 中级 | 捕获执行时间超过阈值的SQL |
+| 异常告警 | 高级 | 连接池耗尽、磁盘空间不足等告警 |
+| 优化建议 | 高级 | 基于慢查询提供索引优化建议 |
+
+#### 5. 接入层 (Access Layer)
+
+最上层，面向用户的访问入口：
+
+**功能列表（从低级到高级）**
+
+| 功能 | 级别 | 说明 |
+|-----|------|------|
+| RESTful API | 基础 | 标准HTTP接口，OpenAPI文档 |
+| CLI Tool | 基础 | 终端命令行工具，支持脚本化 |
+| WebSocket | 中级 | 实时交互，长连接支持 |
+| JDBC Driver | 高级 | Java生态无缝集成，IDEA直连 |
+| WebUI | 高级 | 可视化操作界面 |
+
+**各接入方式详解**
+
+| 接入方式 | 协议 | 适用场景 | 特点 |
+|---------|------|---------|------|
+| RESTful API | HTTP/HTTPS | 系统集成、脚本调用 | 标准化、易集成 |
+| CLI Tool | 命令行 | 运维操作、自动化脚本 | 轻量、可编程 |
+| WebSocket | WS/WSS | WebUI实时交互 | 低延迟、双向通信 |
+| JDBC Driver | JDBC | Java应用、IDEA连接 | 透明代理、无感知 |
+| WebUI | HTTP/WS | 可视化操作 | 友好界面、功能丰富 |
+
+**JDBC连接示例**
+
+```java
+String url = "jdbc:mystisql://gateway-host:port/database-instance";
+Connection conn = DriverManager.getConnection(url, "user", "password");
+```
+
+## 安全架构
+
+### Mermaid 版本
+
+```mermaid
+flowchart TB
+    subgraph L1[Layer 1: 身份认证]
+        direction LR
+        L1A[K8s ServiceAccount]
+        L1B[OIDC]
+        L1C[LDAP]
+        L1D[Token]
+    end
+
+    subgraph L2[Layer 2: 权限控制 RBAC]
+        direction TB
+        L2A[库级别权限<br/>可访问哪些数据库]
+        L2B[表级别权限<br/>可访问哪些表]
+        L2C[操作级别权限<br/>SELECT/INSERT/UPDATE/DELETE/DDL]
+    end
+
+    subgraph L3[Layer 3: SQL审计与防护]
+        direction LR
+        L3A[危险操作检测与拦截]
+        L3B[敏感表访问告警]
+        L3C[全量SQL执行日志]
+    end
+
+    subgraph L4[Layer 4: 网络安全]
+        direction LR
+        L4A[TLS加密传输]
+        L4B[IP白名单/黑名单]
+        L4C[限流防刷]
+    end
+
+    L1 --> L2
+    L2 --> L3
+    L3 --> L4
+```
+
+### PlantUML 版本
+
+```plantuml
+@startuml 安全架构图
+skinparam rectangle {
+    BackgroundColor<<layer1>> LightBlue
+    BackgroundColor<<layer2>> LightGreen
+    BackgroundColor<<layer3>> LightYellow
+    BackgroundColor<<layer4>> LightPink
+}
+
+rectangle "Layer 1: 身份认证" as L1 <<layer1>> {
+    rectangle "K8s ServiceAccount" as L1A
+    rectangle "OIDC" as L1B
+    rectangle "LDAP" as L1C
+    rectangle "Token" as L1D
+}
+
+rectangle "Layer 2: 权限控制 RBAC" as L2 <<layer2>> {
+    rectangle "库级别权限\n可访问哪些数据库" as L2A
+    rectangle "表级别权限\n可访问哪些表" as L2B
+    rectangle "操作级别权限\nSELECT/INSERT/UPDATE/DELETE/DDL" as L2C
+}
+
+rectangle "Layer 3: SQL审计与防护" as L3 <<layer3>> {
+    rectangle "危险操作检测与拦截" as L3A
+    rectangle "敏感表访问告警" as L3B
+    rectangle "全量SQL执行日志" as L3C
+}
+
+rectangle "Layer 4: 网络安全" as L4 <<layer4>> {
+    rectangle "TLS加密传输" as L4A
+    rectangle "IP白名单/黑名单" as L4B
+    rectangle "限流防刷" as L4C
+}
+
+L1 --> L2 : 认证通过
+L2 --> L3 : 权限验证
+L3 --> L4 : 审计记录
+
+@enduml
+```
+
+## 技术栈
+
+| 模块 | 技术选型 | 说明 |
+|-----|---------|------|
+| Web框架 | Gin / Fiber | 高性能HTTP框架 |
+| 数据库驱动 | go-sql-driver/mysql, pgx, go-ora | 官方/社区维护 |
+| K8s集成 | client-go | 官方SDK |
+| WebSocket | gorilla/websocket | 成熟稳定 |
+| CLI框架 | cobra + viper | 命令行标准组合 |
+| 权限控制 | casbin | 强大的访问控制库 |
+| 日志 | zap | 结构化日志 |
+| 缓存 | go-cache / ristretto | 元数据缓存 |
+
+## 产品特性
+
+### 1. 智能SQL路由
+- 自动识别读写请求，路由到主库/从库
+- 支持分库分表场景的透明访问
+
+### 2. 查询历史与收藏
+- 保存常用SQL查询
+- 支持分享SQL片段给团队成员
+
+### 3. 数据脱敏预览
+- 敏感字段自动脱敏显示
+- 基于角色的脱敏策略
+
+### 4. 慢查询分析
+- 自动捕获执行时间超过阈值的SQL
+- 提供优化建议
+
+### 5. 数据库健康看板
+- 实时展示连接数、QPS、慢查询Top10
+- 异常告警
+
+## 开发路线
+
+> 按照从底层到上层、从基础功能到高级功能的顺序规划，JDBC驱动作为核心接入能力优先实现
+
+### Phase 1: 基础设施层 (Infrastructure)
+
+**目标**：建立最底层的基础能力，实现数据库实例发现和连接
+
+#### 1.1 服务发现层 - 基础功能
+- [ ] 实例注册接口（手动添加数据库实例）
+- [ ] 静态配置发现（从配置文件读取实例列表）
+- [ ] 实例信息存储（内存/文件）
+
+#### 1.2 连接层 - 基础功能
+- [ ] MySQL驱动集成（go-sql-driver/mysql）
+- [ ] 连接建立（基础连接功能）
+- [ ] 连接配置管理（host、port、username、password）
+
+#### 1.3 接入层 - 基础功能
+- [ ] RESTful API框架搭建（Gin）
+- [ ] 健康检查接口
+- [ ] CLI基础框架（cobra）
+
+**交付物**：能够通过配置文件添加MySQL实例，通过API/CLI连接并执行简单SQL
+
+---
+
+### Phase 2: 核心引擎层 + JDBC驱动 (Core Engine & JDBC)
+
+**目标**：实现SQL查询的核心处理能力，**同时发布JDBC驱动**，让用户可以在DataGrip、DBeaver等工具中使用
+
+#### 2.1 服务发现层 - 中级功能
+- [ ] K8s API动态发现（client-go）
+- [ ] ConfigMap配置源支持
+- [ ] 实例状态监控（健康检查）
+
+#### 2.2 连接层 - 中级功能
+- [ ] 连接池管理（连接复用）
+- [ ] 连接健康检查
+- [ ] 自动重连机制
+
+#### 2.3 服务层 - 核心引擎
+- [ ] SQL解析（基础SQL语法解析）
+- [ ] SQL路由（根据实例名路由）
+- [ ] 查询超时控制
+- [ ] 结果集大小限制
+- [ ] 表结构缓存（Schema Cache）
+
+#### 2.4 接入层 - 基础功能完善
+- [ ] SQL执行接口（POST /api/v1/query）
+- [ ] 实例列表接口（GET /api/v1/instances）
+- [ ] CLI查询命令（mystisql query）
+
+#### 2.5 JDBC驱动 - 核心功能 ⭐P0
+- [ ] JDBC Driver基础框架（实现Driver接口）
+- [ ] Connection连接实现（连接MystiSql Gateway）
+- [ ] Statement/PreparedStatement实现（SQL执行）
+- [ ] ResultSet结果集实现（结果返回）
+- [ ] DatabaseMetaData实现（元数据查询，支持IDE工具识别）
+- [ ] 连接URL格式：`jdbc:mystisql://gateway-host:port/database-instance`
+
+**交付物**：
+- 完整的SQL查询能力，支持K8s动态发现，连接池管理
+- **JDBC驱动发布**，可在DataGrip、DBeaver、SQuirreL等工具中使用
+
+---
+
+### Phase 3: 安全控制层 (Security)
+
+**目标**：实现企业级安全控制能力
+
+#### 3.1 服务层 - 安全控制
+- [ ] Token认证（基础认证）
+- [ ] SQL执行记录（审计日志基础）
+- [ ] 危险操作检测（DROP、TRUNCATE拦截）
+- [ ] SQL白名单/黑名单
+
+#### 3.2 接入层 - 中级功能
+- [ ] WebSocket支持（实时交互）
+- [ ] CLI认证集成
+- [ ] API认证中间件
+
+#### 3.3 连接层 - 扩展
+- [ ] PostgreSQL驱动支持（pgx）
+- [ ] 多数据库类型路由
+
+#### 3.4 JDBC驱动 - 增强
+- [ ] JDBC连接池支持（HikariCP兼容）
+- [ ] 事务支持（基础事务管理）
+- [ ] 批量操作支持
+- [ ] 认证集成（Token传递）
+
+**交付物**：具备安全控制能力的数据库访问网关，JDBC驱动功能完善
+
+---
+
+### Phase 4: 企业增强层 (Enterprise)
+
+**目标**：企业级功能完善，支持生产环境部署
+
+#### 4.1 服务发现层 - 高级功能
+- [ ] 实例动态感知（Watch机制）
+- [ ] 服务注册中心发现（Consul/Nacos）
+- [ ] 多集群实例管理
+
+#### 4.2 连接层 - 高级功能
+- [ ] 读写分离（主从路由）
+- [ ] 主从切换感知
+
+#### 4.3 服务层 - 安全增强
+- [ ] K8s ServiceAccount集成
+- [ ] OIDC/LDAP集成
+- [ ] RBAC权限模型（库级别、表级别、操作级别）
+- [ ] 全量审计日志
+- [ ] SQL注入防护
+- [ ] 敏感字段识别
+- [ ] 规则脱敏
+
+#### 4.4 接入层 - 高级功能
+- [ ] WebUI基础界面
+- [ ] SQL编辑器（语法高亮）
+- [ ] 结果集展示
+- [ ] Oracle驱动支持（go-ora）
+
+**交付物**：企业级数据库访问平台，支持多数据库、完整安全控制
+
+---
+
+### Phase 5: 智能化层 (Intelligence)
+
+**目标**：智能化运维和高级用户体验
+
+#### 5.1 服务层 - 支撑服务
+- [ ] 结果格式化（JSON/CSV/Table）
+- [ ] 分页处理
+- [ ] 导出功能（Excel/SQL）
+- [ ] 连接数监控
+- [ ] 慢查询捕获
+- [ ] 异常告警
+- [ ] 优化建议（索引推荐）
+
+#### 5.2 服务层 - 高级安全
+- [ ] 基于角色的脱敏策略
+- [ ] 完整审计链路
+
+#### 5.3 接入层 - 高级功能
+- [ ] WebUI完整功能
+- [ ] 查询历史与收藏
+- [ ] 数据库健康看板
+- [ ] Redis驱动支持（go-redis）
+
+**交付物**：智能化数据库运维平台
+
+---
+
+### 开发路线图
+
+```mermaid
+gantt
+    title MystiSql 开发路线图
+    dateFormat  YYYY-MM-DD
+    section Phase 1
+    基础设施层           :p1, 2024-01-01, 14d
+    section Phase 2
+    核心引擎层+JDBC驱动  :p2, after p1, 28d
+    section Phase 3
+    安全控制层           :p3, after p2, 14d
+    section Phase 4
+    企业增强层           :p4, after p3, 21d
+    section Phase 5
+    智能化层             :p5, after p4, 21d
+```
+
+### 功能优先级矩阵
+
+| 优先级 | 功能 | 阶段 | 价值 |
+|-------|------|------|------|
+| **P0** | MySQL连接、静态配置发现、RESTful API | Phase 1 | MVP核心 |
+| **P0** | SQL解析路由、连接池 | Phase 2 | 核心能力 |
+| **P0** | **JDBC驱动（核心功能）** | Phase 2 | **IDE工具集成** |
+| P1 | K8s动态发现、Token认证、审计日志 | Phase 2-3 | 生产可用 |
+| P1 | PostgreSQL支持、WebSocket | Phase 3 | 多数据库 |
+| P1 | JDBC驱动增强（连接池、事务） | Phase 3 | JDBC完善 |
+| P2 | RBAC权限、读写分离、WebUI | Phase 4 | 企业级 |
+| P2 | OIDC/LDAP、数据脱敏、Oracle支持 | Phase 4 | 安全合规 |
+| P3 | 慢查询分析、健康看板 | Phase 5 | 智能化 |
+| P3 | 优化建议、Redis支持 | Phase 5 | 高级特性 |
+
+### 里程碑
+
+| 里程碑 | 阶段完成 | 核心能力 |
+|-------|---------|---------|
+| **M1** | Phase 1 | 可连接MySQL执行SQL |
+| **M2** | Phase 2 | **JDBC驱动发布**、K8s动态发现、连接池、完整查询能力 |
+| **M3** | Phase 3 | 安全认证、审计日志、PostgreSQL支持、JDBC增强 |
+| **M4** | Phase 4 | 企业级权限、读写分离、WebUI上线 |
+| **M5** | Phase 5 | 智能化运维平台 |
+
+### JDBC驱动使用场景
+
+JDBC驱动发布后，用户可以在以下工具中直接使用MystiSql：
+
+| 工具 | 使用场景 | 优势 |
+|-----|---------|------|
+| **DataGrip** | 开发调试 | 无需配置port-forward，直接连接K8s数据库 |
+| **DBeaver** | 数据管理 | 统一管理多个K8s数据库实例 |
+| **SQuirreL SQL** | 通用SQL客户端 | 跨平台支持 |
+| **JMeter** | 性能测试 | 直接对K8s数据库进行压测 |
+| **自定义Java应用** | 业务集成 | 应用层透明访问K8s数据库 |
+
+**连接示例**：
+```java
+// DataGrip / DBeaver 配置
+String url = "jdbc:mystisql://mystisql-gateway.example.com:3306/production-mysql";
+String user = "your-username";
+String password = "your-token";
+
+Connection conn = DriverManager.getConnection(url, user, password);
+Statement stmt = conn.createStatement();
+ResultSet rs = stmt.executeQuery("SELECT * FROM users LIMIT 10");
+```
+
+## 部署架构
+
+### Mermaid 版本
+
+```mermaid
+flowchart TB
+    subgraph Users[外部用户]
+        direction LR
+        U1[开发者<br/>IDEA/JDBC]
+        U2[运维人员<br/>CLI/WebUI]
+    end
+
+    subgraph Cluster[K8s Cluster]
+        subgraph MystiSqlDeploy[MystiSql Deployment]
+            direction LR
+            P1[API Pod]
+            P2[API Pod]
+            P3[API Pod]
+        end
+        
+        SVC[Service<br/>LoadBalancer/NodePort]
+        
+        subgraph DBInstances[Database Instances]
+            direction LR
+            DB1[(MySQL Master)]
+            DB2[(MySQL Slave)]
+            DB3[(PostgreSQL)]
+            DB4[(Oracle)]
+        end
+    end
+
+    U1 -.->|jdbc:mystisql://| SVC
+    U2 -.->|https/cli| SVC
+    
+    P1 --> SVC
+    P2 --> SVC
+    P3 --> SVC
+    
+    SVC --> DB1
+    SVC --> DB2
+    SVC --> DB3
+    SVC --> DB4
+```
+
+### PlantUML 版本
+
+```plantuml
+@startuml 部署架构图
+skinparam componentStyle rectangle
+
+actor "开发者\nIDEA/JDBC" as U1
+actor "运维人员\nCLI/WebUI" as U2
+
+package "K8s Cluster" as Cluster {
+    package "MystiSql Deployment" as MystiSqlDeploy {
+        component "API Pod" as P1
+        component "API Pod" as P2
+        component "API Pod" as P3
+    }
+    
+    component "Service\nLoadBalancer/NodePort" as SVC
+    
+    package "Database Instances" as DBInstances {
+        database "MySQL Master" as DB1
+        database "MySQL Slave" as DB2
+        database "PostgreSQL" as DB3
+        database "Oracle" as DB4
+    }
+}
+
+U1 -[dotted]-> SVC : jdbc:mystisql://
+U2 -[dotted]-> SVC : https/cli
+
+P1 --> SVC
+P2 --> SVC
+P3 --> SVC
+
+SVC --> DB1
+SVC --> DB2
+SVC --> DB3
+SVC --> DB4
+
+@enduml
+```
+
+## 快速开始
+
+(待补充)
+
+## 配置说明
+
+(待补充)
+
+## API文档
+
+(待补充)

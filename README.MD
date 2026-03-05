@@ -27,12 +27,9 @@
 
 > 架构层次从下往上：数据库实例 → 服务发现 → 连接层 → 服务层 → 接入层
 
-#### Mermaid 版本
-
 ```mermaid
 flowchart BT
     subgraph DBLayer[数据库实例层 Database Layer]
-        direction LR
         D1[(MySQL Master)]
         D2[(MySQL Slave)]
         D3[(PostgreSQL)]
@@ -45,7 +42,6 @@ flowchart BT
     end
 
     subgraph ConnectionLayer[连接层 Connection Layer]
-        direction LR
         C1[MySQL Driver<br/>go-sql-driver]
         C2[PostgreSQL Driver<br/>pgx]
         C3[Oracle Driver<br/>go-ora]
@@ -71,7 +67,6 @@ flowchart BT
     end
 
     subgraph AccessLayer[接入层 Access Layer]
-        direction LR
         A1[RESTful API<br/>标准HTTP]
         A2[WebSocket<br/>实时交互]
         A3[JDBC Driver<br/>Java生态]
@@ -84,67 +79,6 @@ flowchart BT
     CoreGroup --> SecurityGroup
     SecurityGroup --> SupportGroup
     SupportGroup --> AccessLayer
-```
-
-#### PlantUML 版本
-
-```plantuml
-@startuml MystiSql架构图
-!define RECTANGLE class
-
-database "数据库实例层 Database Layer" as DBLayer <<Rectangle>> {
-    database "MySQL Master" as D1
-    database "MySQL Slave" as D2
-    database "PostgreSQL" as D3
-    database "Oracle" as D4
-    database "Redis" as D5
-}
-
-package "服务发现层 Discovery Layer" as K8sLayer <<Rectangle>> {
-    [Instance Discoverer\nK8s API / Config / Static] as K1
-}
-
-package "连接层 Connection Layer" as ConnectionLayer <<Rectangle>> {
-    [MySQL Driver\ngo-sql-driver] as C1
-    [PostgreSQL Driver\npgx] as C2
-    [Oracle Driver\ngo-ora] as C3
-    [Redis Driver\ngo-redis] as C4
-}
-
-package "服务层 Service Layer" as ServiceLayer <<Rectangle>> {
-    package "核心引擎" as CoreGroup {
-        [Query Engine\nSQL解析路由] as S1
-        [Schema Cache\n元数据缓存] as S4
-    }
-    
-    package "安全控制" as SecurityGroup {
-        [Auth Module\nRBAC权限] as S2
-        [Audit Logger\n操作审计] as S3
-        [SQL Validator\n安全检查] as S5
-        [Data Masking\n数据脱敏] as S7
-    }
-    
-    package "支撑服务" as SupportGroup {
-        [Result Formatter\n格式化] as S6
-        [Health Monitor\n健康监控] as S8
-    }
-}
-
-package "接入层 Access Layer" as AccessLayer <<Rectangle>> {
-    [RESTful API\n标准HTTP] as A1
-    [WebSocket\n实时交互] as A2
-    [JDBC Driver\nJava生态] as A3
-    [CLI Tool\n终端操作] as A4
-}
-
-DBLayer --> K8sLayer : 实例注册
-K8sLayer --> ConnectionLayer : 服务发现
-ConnectionLayer --> CoreGroup : 连接建立
-CoreGroup --> SecurityGroup : 安全检查
-SecurityGroup --> SupportGroup : 结果处理
-SupportGroup --> AccessLayer : 响应输出
-
-@enduml
 ```
 
 ### 模块详解
@@ -404,12 +338,10 @@ Connection conn = DriverManager.getConnection(url, "user", "password");
 
 ## 安全架构
 
-### Mermaid 版本
-
 ```mermaid
 flowchart TB
     subgraph L1[Layer 1: 身份认证]
-        direction LR
+        direction TB
         L1A[K8s ServiceAccount]
         L1B[OIDC]
         L1C[LDAP]
@@ -424,14 +356,14 @@ flowchart TB
     end
 
     subgraph L3[Layer 3: SQL审计与防护]
-        direction LR
+        direction TB
         L3A[危险操作检测与拦截]
         L3B[敏感表访问告警]
         L3C[全量SQL执行日志]
     end
 
     subgraph L4[Layer 4: 网络安全]
-        direction LR
+        direction TB
         L4A[TLS加密传输]
         L4B[IP白名单/黑名单]
         L4C[限流防刷]
@@ -440,49 +372,6 @@ flowchart TB
     L1 --> L2
     L2 --> L3
     L3 --> L4
-```
-
-### PlantUML 版本
-
-```plantuml
-@startuml 安全架构图
-skinparam rectangle {
-    BackgroundColor<<layer1>> LightBlue
-    BackgroundColor<<layer2>> LightGreen
-    BackgroundColor<<layer3>> LightYellow
-    BackgroundColor<<layer4>> LightPink
-}
-
-rectangle "Layer 1: 身份认证" as L1 <<layer1>> {
-    rectangle "K8s ServiceAccount" as L1A
-    rectangle "OIDC" as L1B
-    rectangle "LDAP" as L1C
-    rectangle "Token" as L1D
-}
-
-rectangle "Layer 2: 权限控制 RBAC" as L2 <<layer2>> {
-    rectangle "库级别权限\n可访问哪些数据库" as L2A
-    rectangle "表级别权限\n可访问哪些表" as L2B
-    rectangle "操作级别权限\nSELECT/INSERT/UPDATE/DELETE/DDL" as L2C
-}
-
-rectangle "Layer 3: SQL审计与防护" as L3 <<layer3>> {
-    rectangle "危险操作检测与拦截" as L3A
-    rectangle "敏感表访问告警" as L3B
-    rectangle "全量SQL执行日志" as L3C
-}
-
-rectangle "Layer 4: 网络安全" as L4 <<layer4>> {
-    rectangle "TLS加密传输" as L4A
-    rectangle "IP白名单/黑名单" as L4B
-    rectangle "限流防刷" as L4C
-}
-
-L1 --> L2 : 认证通过
-L2 --> L3 : 权限验证
-L3 --> L4 : 审计记录
-
-@enduml
 ```
 
 ## 技术栈
@@ -744,8 +633,6 @@ ResultSet rs = stmt.executeQuery("SELECT * FROM users LIMIT 10");
 
 ## 部署架构
 
-### Mermaid 版本
-
 ```mermaid
 flowchart TB
     subgraph Users[外部用户]
@@ -784,47 +671,6 @@ flowchart TB
     SVC --> DB2
     SVC --> DB3
     SVC --> DB4
-```
-
-### PlantUML 版本
-
-```plantuml
-@startuml 部署架构图
-skinparam componentStyle rectangle
-
-actor "开发者\nIDEA/JDBC" as U1
-actor "运维人员\nCLI/WebUI" as U2
-
-package "K8s Cluster" as Cluster {
-    package "MystiSql Deployment" as MystiSqlDeploy {
-        component "API Pod" as P1
-        component "API Pod" as P2
-        component "API Pod" as P3
-    }
-    
-    component "Service\nLoadBalancer/NodePort" as SVC
-    
-    package "Database Instances" as DBInstances {
-        database "MySQL Master" as DB1
-        database "MySQL Slave" as DB2
-        database "PostgreSQL" as DB3
-        database "Oracle" as DB4
-    }
-}
-
-U1 -[dotted]-> SVC : jdbc:mystisql://
-U2 -[dotted]-> SVC : https/cli
-
-P1 --> SVC
-P2 --> SVC
-P3 --> SVC
-
-SVC --> DB1
-SVC --> DB2
-SVC --> DB3
-SVC --> DB4
-
-@enduml
 ```
 
 ## 快速开始

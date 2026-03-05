@@ -262,3 +262,13 @@ for _, item := range items {
 - [ ] Documentation updated if needed
 - [ ] No sensitive data in code
 - [ ] Breaking changes documented
+
+## Communication Language
+
+- **Primary Language**: Chinese
+- **Documentation**: Chinese preferred
+- **Code Comments**: Chinese or English (consistent per file)
+- **Communication**: All interactions with users should be in Chinese
+- **Generated Documents**: Should be in Chinese whenever possible
+
+This ensures consistent communication with the project maintainers and aligns with the project's target audience.

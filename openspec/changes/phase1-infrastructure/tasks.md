@@ -9,30 +9,30 @@
 ## 2. 配置管理
 
 - [x] 2.1 创建配置文件示例 config/config.yaml（包含实例配置示例）
-- [ ] 2.2 实现配置加载 internal/config/loader.go（Load、Validate 方法）
-- [ ] 2.3 添加配置验证逻辑（必填字段检查、格式验证）
-- [ ] 2.4 支持多配置文件路径查找（./config.yaml、./config/config.yaml、/etc/mystisql/config.yaml）
-- [ ] 2.5 支持环境变量覆盖配置（Viper 自动支持）
-- [ ] 2.6 测试配置加载功能
+- [x] 2.2 实现配置加载 internal/config/loader.go（Load、Validate 方法）
+- [x] 2.3 添加配置验证逻辑（必填字段检查、格式验证）
+- [x] 2.4 支持多配置文件路径查找（./config.yaml、./config/config.yaml、/etc/mystisql/config.yaml）
+- [x] 2.5 支持环境变量覆盖配置（Viper 自动支持）
+- [x] 2.6 测试配置加载功能（创建 loader_test.go）
 
 ## 3. 服务发现（静态）
-- [ ] 3.1 定义 InstanceDiscoverer 接口 internal/discovery/types.go
-- [ ] 3.2 定义 InstanceRegistry 接口 internal/discovery/types.go
-- [ ] 3.3 实现 InstanceRegistry internal/discovery/registry.go（Register、GetInstance、ListInstances 方法）
-- [ ] 3.4 实现 StaticDiscoverer internal/discovery/static/discoverer.go（Name、Discover 方法）
-- [ ] 3.5 连接 StaticDiscoverer 到配置加载器
-- [ ] 3.6 测试实例注册和发现功能
+- [x] 3.1 定义 InstanceDiscoverer 接口 internal/discovery/types.go
+- [x] 3.2 定义 InstanceRegistry 接口 internal/discovery/types.go
+- [x] 3.3 实现 InstanceRegistry internal/discovery/registry.go（Register、GetInstance、ListInstances 方法）
+- [x] 3.4 实现 StaticDiscoverer internal/discovery/static/discoverer.go（Name、Discover 方法）
+- [x] 3.5 连接 StaticDiscoverer 到配置加载器
+- [x] 3.6 测试实例注册和发现功能
 
 ## 4. MySQL 连接
-- [ ] 4.1 定义 Connection 接口 internal/connection/types.go
-- [ ] 4.2 实现 MySQLConnection internal/connection/mysql/connection.go
-- [ ] 4.3 实现 Connect() 方法（支持超时、错误处理）
-- [ ] 4.4 实现 Query() 方法（支持 context、结果集处理）
-- [ ] 4.5 实现 Exec() 方法（INSERT/UPDATE/DELETE）
-- [ ] 4.6 实现 Ping() 方法（连接健康检查）
-- [ ] 4.7 实现 Close() 方法（资源清理）
-- [ ] 4.8 添加连接字符串构建逻辑（从 InstanceConfig 构建 Dsn）
-- [ ] 4.9 测试 MySQL 连接功能（需要测试数据库）
+- [x] 4.1 定义 Connection 接口 internal/connection/types.go
+- [x] 4.2 实现 MySQLConnection internal/connection/mysql/connection.go
+- [x] 4.3 实现 Connect() 方法（支持超时、错误处理）
+- [x] 4.4 实现 Query() 方法（支持 context、结果集处理）
+- [x] 4.5 实现 Exec() 方法（INSERT/UPDATE/DELETE）
+- [x] 4.6 实现 Ping() 方法（连接健康检查）
+- [x] 4.7 实现 Close() 方法（资源清理）
+- [x] 4.8 添加连接字符串构建逻辑（从 InstanceConfig 构建 Dsn）
+- [x] 4.9 测试 MySQL 连接功能（创建 connection_test.go）
 
 ## 5. CLI 硡础框架
 - [ ] 5.1 创建 CLI 入口 cmd/mystisql/main.go（初始化 Cobra、Viper、zap logger）

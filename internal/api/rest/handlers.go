@@ -1,0 +1,268 @@
+package rest
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"time"
+
+	"MystiSql/internal/connection"
+	"MystiSql/internal/connection/mysql"
+	"MystiSql/internal/discovery"
+	"MystiSql/pkg/types"
+
+	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
+)
+
+// Handlers API 处理器
+type Handlers struct {
+	registry discovery.InstanceRegistry
+	logger   *zap.Logger
+	version  string
+}
+
+// NewHandlers 创建新的处理器
+func NewHandlers(registry discovery.InstanceRegistry, logger *zap.Logger, version string) *Handlers {
+	return &Handlers{
+		registry: registry,
+		logger:   logger,
+		version:  version,
+	}
+}
+
+// Health 健康检查端点
+// GET /health
+// 查询参数：
+//   - check-instances: 是否检查实例健康状态（true/false）
+func (h *Handlers) Health(c *gin.Context) {
+	// 获取查询参数
+	checkInstances := c.Query("check-instances") == "true"
+
+	response := HealthResponse{
+		Status:    "healthy",
+		Timestamp: time.Now(),
+		Version:   h.version,
+	}
+
+	// 如果需要检查实例健康状态
+	if checkInstances {
+		instancesHealth := h.checkInstancesHealth(c.Request.Context())
+		response.Instances = instancesHealth
+
+		// 如果有实例且全部不健康，则整体状态为 unhealthy
+		if instancesHealth.Total > 0 && instancesHealth.Healthy == 0 {
+			response.Status = "unhealthy"
+		}
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// checkInstancesHealth 检查所有实例的健康状态
+func (h *Handlers) checkInstancesHealth(ctx context.Context) *InstancesHealth {
+	instances, err := h.registry.ListInstances()
+	if err != nil {
+		h.logger.Error("Failed to list instances", zap.Error(err))
+		return &InstancesHealth{
+			Total:     0,
+			Healthy:   0,
+			Unhealthy: 0,
+			Details:   []InstanceHealthDetail{},
+		}
+	}
+
+	health := &InstancesHealth{
+		Total:     len(instances),
+		Healthy:   0,
+		Unhealthy: 0,
+		Details:   make([]InstanceHealthDetail, 0, len(instances)),
+	}
+
+	// 检查每个实例
+	for _, instance := range instances {
+		detail := InstanceHealthDetail{
+			Name:   instance.Name,
+			Type:   string(instance.Type),
+			Status: string(instance.Status),
+		}
+
+		// 如果实例状态未知，尝试 ping 检查
+		if instance.Status == types.InstanceStatusUnknown {
+			status := h.pingInstance(ctx, instance)
+			detail.Status = string(status)
+		}
+
+		health.Details = append(health.Details, detail)
+
+		// 统计健康和不健康数量
+		if detail.Status == string(types.InstanceStatusHealthy) {
+			health.Healthy++
+		} else {
+			health.Unhealthy++
+		}
+	}
+
+	return health
+}
+
+// pingInstance 通过建立连接检查实例健康状态
+func (h *Handlers) pingInstance(ctx context.Context, instance *types.DatabaseInstance) types.InstanceStatus {
+	// 创建连接
+	var conn connection.Connection
+	switch instance.Type {
+	case types.DatabaseTypeMySQL:
+		conn = mysql.NewConnection(instance)
+	default:
+		return types.InstanceStatusUnknown
+	}
+
+	// 尝试连接
+	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	if err := conn.Connect(pingCtx); err != nil {
+		h.logger.Warn("Failed to connect to instance",
+			zap.String("instance", instance.Name),
+			zap.Error(err),
+		)
+		return types.InstanceStatusUnhealthy
+	}
+	defer func() {
+		_ = conn.Close()
+	}()
+
+	// Ping 测试
+	if err := conn.Ping(pingCtx); err != nil {
+		h.logger.Warn("Failed to ping instance",
+			zap.String("instance", instance.Name),
+			zap.Error(err),
+		)
+		return types.InstanceStatusUnhealthy
+	}
+
+	return types.InstanceStatusHealthy
+}
+
+// ListInstances 列出所有实例
+// GET /api/v1/instances
+func (h *Handlers) ListInstances(c *gin.Context) {
+	// 获取所有实例
+	instances, err := h.registry.ListInstances()
+	if err != nil {
+		h.logger.Error("Failed to list instances", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, NewErrorResponse(
+			"INTERNAL_ERROR",
+			"Failed to list instances",
+		))
+		return
+	}
+
+	// 转换为响应格式（脱敏密码）
+	instanceResponses := make([]InstanceResponse, 0, len(instances))
+	for _, instance := range instances {
+		instanceResponses = append(instanceResponses, ToInstanceResponse(instance))
+	}
+
+	response := InstancesListResponse{
+		Total:     len(instanceResponses),
+		Instances: instanceResponses,
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// Query 执行查询
+// POST /api/v1/query
+func (h *Handlers) Query(c *gin.Context) {
+	// 解析请求
+	var req QueryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, NewErrorResponse(
+			"INVALID_REQUEST",
+			fmt.Sprintf("Invalid request: %v", err),
+		))
+		return
+	}
+
+	// 获取实例
+	instance, err := h.registry.GetInstance(req.Instance)
+	if err != nil {
+		c.JSON(http.StatusNotFound, NewErrorResponse(
+			"INSTANCE_NOT_FOUND",
+			fmt.Sprintf("Instance '%s' not found", req.Instance),
+		))
+		return
+	}
+
+	// 设置超时
+	timeout := 30 * time.Second // 默认 30 秒
+	if req.Timeout > 0 {
+		timeout = time.Duration(req.Timeout) * time.Second
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
+	defer cancel()
+
+	// 创建连接
+	var conn connection.Connection
+	switch instance.Type {
+	case types.DatabaseTypeMySQL:
+		conn = mysql.NewConnection(instance)
+	default:
+		c.JSON(http.StatusBadRequest, NewErrorResponse(
+			"UNSUPPORTED_DATABASE",
+			fmt.Sprintf("Unsupported database type: %s", instance.Type),
+		))
+		return
+	}
+
+	// 建立连接
+	if err := conn.Connect(ctx); err != nil {
+		h.logger.Error("Failed to connect to database",
+			zap.String("instance", instance.Name),
+			zap.Error(err),
+		)
+		c.JSON(http.StatusInternalServerError, NewErrorResponse(
+			"CONNECTION_FAILED",
+			fmt.Sprintf("Failed to connect to database: %v", err),
+		))
+		return
+	}
+	defer func() {
+		_ = conn.Close()
+	}()
+
+	// 执行查询
+	start := time.Now()
+	result, err := conn.Query(ctx, req.SQL)
+	execTime := time.Since(start)
+
+	if err != nil {
+		h.logger.Error("Query failed",
+			zap.String("instance", instance.Name),
+			zap.String("sql", req.SQL),
+			zap.Error(err),
+		)
+		c.JSON(http.StatusInternalServerError, &QueryResponse{
+			Success:       false,
+			ExecutionTime: execTime,
+			Error: &ErrorDetail{
+				Code:    "QUERY_FAILED",
+				Message: fmt.Sprintf("Query failed: %v", err),
+			},
+		})
+		return
+	}
+
+	// 返回成功响应
+	c.JSON(http.StatusOK, &QueryResponse{
+		Success:       true,
+		ExecutionTime: execTime,
+		Data: &QueryResultData{
+			Columns:  result.Columns,
+			Rows:     result.Rows,
+			RowCount: result.RowCount,
+		},
+	})
+}

@@ -1,0 +1,71 @@
+# MystiSql 配置文件示例
+# 此文件定义了 MystiSql 服务器的配置和数据库实例信息
+
+# 服务器配置
+server:
+  host: 0.0.0.0        # API 服务器监听地址（默认：0.0.0.0 监听所有接口）
+  port: 8080           # API 服务器监听端口（默认：8080）
+  mode: release        # 运行模式：debug（调试）或 release（生产）（默认：release）
+
+# 服务发现配置
+discovery:
+  type: static         # 发现类型：static（静态配置）、k8s（K8s API）、consul（Consul）
+
+# 数据库实例列表
+# 支持的数据库类型：mysql、postgresql、oracle、redis
+instances:
+  # MySQL 实例示例 1 - 生产环境主库
+  - name: production-mysql-master
+    type: mysql
+    host: mysql-master.production.svc.cluster.local
+    port: 3306
+    username: mystisql_user
+    password: your_secure_password_here
+    database: production_db
+    labels:
+      environment: production
+      role: master
+      team: backend
+
+  # MySQL 实例示例 2 - 生产环境从库
+  - name: production-mysql-slave
+    type: mysql
+    host: mysql-slave.production.svc.cluster.local
+    port: 3306
+    username: mystisql_user
+    password: your_secure_password_here
+    database: production_db
+    labels:
+      environment: production
+      role: slave
+      team: backend
+
+  # MySQL 实例示例 3 - 开发环境
+  - name: dev-mysql
+    type: mysql
+    host: localhost
+    port: 3306
+    username: root
+    password: root
+    database: dev_db
+    labels:
+      environment: development
+      team: dev
+
+# 注意事项：
+# 1. password 字段是可选的，但如果不提供，某些操作可能会失败
+# 2. database 字段是可选的，如果提供，连接时会使用该数据库
+# 3. labels 是可选的，用于组织和筛选实例
+# 4. 建议不要在配置文件中硬编码密码，可以使用环境变量覆盖：
+#    export MYSTISQL_INSTANCES_0_PASSWORD=your_password
+
+# 环境变量覆盖示例：
+# MYSTISQL_SERVER_HOST=0.0.0.0
+# MYSTISQL_SERVER_PORT=8080
+# MYSTISQL_SERVER_MODE=release
+# MYSTISQL_DISCOVERY_TYPE=static
+# MYSTISQL_INSTANCES_0_NAME=production-mysql
+# MYSTISQL_INSTANCES_0_HOST=mysql.example.com
+# MYSTISQL_INSTANCES_0_PORT=3306
+# MYSTISQL_INSTANCES_0_USERNAME=user
+# MYSTISQL_INSTANCES_0_PASSWORD=secret

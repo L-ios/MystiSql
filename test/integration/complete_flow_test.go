@@ -92,8 +92,7 @@ func TestCompleteFlow(t *testing.T) {
 		instance.SetCredentials("root", "root")
 		instance.SetDatabase("test")
 
-		err := if err := registry.Register(instance); err != nil { t.Fatalf("注册实例失败: %v", err) }
-		if err != nil {
+		if err := registry.Register(instance); err != nil {
 			t.Fatalf("注册实例失败: %v", err)
 		}
 
@@ -115,7 +114,9 @@ func TestCompleteFlow(t *testing.T) {
 		instance.SetCredentials("root", "root")
 		instance.SetDatabase("test")
 
-		if err := registry.Register(instance); err != nil { t.Fatalf("注册实例失败: %v", err) }
+		if err := registry.Register(instance); err != nil {
+			t.Fatalf("注册实例失败: %v", err)
+		}
 
 		engine := query.NewEngine(registry)
 		defer func() { _ = engine.Close() }()
@@ -156,12 +157,11 @@ func TestErrorHandling(t *testing.T) {
 		registry := discovery.NewRegistry()
 		instance := types.NewDatabaseInstance("test-mysql", types.DatabaseTypeMySQL, "localhost", 3306)
 
-		err := if err := registry.Register(instance); err != nil { t.Fatalf("注册实例失败: %v", err) }
-		if err != nil {
+		if err := registry.Register(instance); err != nil {
 			t.Fatalf("第一次注册失败: %v", err)
 		}
 
-		err = if err := registry.Register(instance); err != nil { t.Fatalf("注册实例失败: %v", err) }
+		err := registry.Register(instance)
 		if err == nil {
 			t.Error("期望重复注册失败，但没有返回错误")
 		}
@@ -241,7 +241,9 @@ func TestTimeoutHandling(t *testing.T) {
 	t.Run("上下文超时", func(t *testing.T) {
 		registry := discovery.NewRegistry()
 		instance := types.NewDatabaseInstance("test-mysql", types.DatabaseTypeMySQL, "localhost", 3306)
-		if err := registry.Register(instance); err != nil { t.Fatalf("注册实例失败: %v", err) }
+		if err := registry.Register(instance); err != nil {
+			t.Fatalf("注册实例失败: %v", err)
+		}
 
 		engine := query.NewEngine(registry)
 		defer func() { _ = engine.Close() }()

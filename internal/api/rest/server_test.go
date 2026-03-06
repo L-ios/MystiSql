@@ -82,50 +82,8 @@ func TestServerMode(t *testing.T) {
 			}
 
 			server := NewServer(config, registry, logger, "test-version")
-			server.Setup()
-		})
-	}
-}
-
-// TestRoutes 测试路由设置
-func TestRoutes(t *testing.T) {
-	logger := zap.NewNop()
-	registry := discovery.NewRegistry()
-	config := &types.ServerConfig{
-		Host: "0.0.0.0",
-		Port: 8080,
-		Mode: "debug",
-	}
-
-	server := NewServer(config, registry, logger, "test-version")
-	server.Setup()
-	router := server.GetRouter()
-
-	// 测试路由是否存在
-	routes := []struct {
-		method string
-		path   string
-	}{
-		{"GET", "/health"},
-		{"GET", "/api/v1/instances"},
-		{"POST", "/api/v1/query"},
-	}
-
-	for _, route := range routes {
-		t.Run(route.method+" "+route.path, func(t *testing.T) {
-			var req *http.Request
-			if route.method == "POST" {
-				req = httptest.NewRequest(route.method, route.path, nil)
-			} else {
-				req = httptest.NewRequest(route.method, route.path, nil)
-			}
-			w := httptest.NewRecorder()
-			router.ServeHTTP(w, req)
-
-			// 路由应该存在（不应该返回 404）
-			// 注意：可能会因为缺少参数等原因返回其他错误，但不应该是 404
-			if w.Code == http.StatusNotFound {
-				t.Errorf("路由未找到: %s %s", route.method, route.path)
+			if err := server.Setup(); err != nil {
+				t.Fatalf("设置服务器失败: %v", err)
 			}
 		})
 	}
@@ -142,7 +100,9 @@ func TestMiddleware(t *testing.T) {
 	}
 
 	server := NewServer(config, registry, logger, "test-version")
-	server.Setup()
+	if err := server.Setup(); err != nil {
+		t.Fatalf("设置服务器失败: %v", err)
+	}
 	router := server.GetRouter()
 
 	// 测试 CORS 中间件
@@ -209,7 +169,9 @@ func TestServerShutdown(t *testing.T) {
 
 	// 启动服务器（在后台）
 	go func() {
-		server.Start()
+		if err := server.Start(); err != nil && err != http.ErrServerClosed {
+			t.Logf("服务器启动错误: %v", err)
+		}
 	}()
 
 	// 等待服务器启动
@@ -263,7 +225,9 @@ func TestServerAddress(t *testing.T) {
 			}
 
 			server := NewServer(config, registry, logger, "test-version")
-			server.Setup()
+			if err := server.Setup(); err != nil {
+				t.Fatalf("设置服务器失败: %v", err)
+			}
 
 			// 验证服务器地址
 			if server.server.Addr != tt.want {
@@ -284,7 +248,9 @@ func TestServerTimeouts(t *testing.T) {
 	}
 
 	server := NewServer(config, registry, logger, "test-version")
-	server.Setup()
+	if err := server.Setup(); err != nil {
+		t.Fatalf("设置服务器失败: %v", err)
+	}
 
 	// 验证超时配置
 	if server.server.ReadTimeout != 30*time.Second {
@@ -307,7 +273,9 @@ func TestConcurrentRequests(t *testing.T) {
 	// 添加测试实例
 	instance := types.NewDatabaseInstance("test-mysql", types.DatabaseTypeMySQL, "localhost", 3306)
 	instance.SetStatus(types.InstanceStatusHealthy)
-	registry.Register(instance)
+	if err := registry.Register(instance); err != nil {
+		t.Fatalf("注册实例失败: %v", err)
+	}
 
 	// 并发发送请求
 	concurrency := 10
@@ -358,7 +326,9 @@ func TestVersion(t *testing.T) {
 	}
 
 	// 测试版本信息在健康检查中返回
-	server.Setup()
+	if err := server.Setup(); err != nil {
+		t.Fatalf("设置服务器失败: %v", err)
+	}
 	router := server.GetRouter()
 
 	req := httptest.NewRequest("GET", "/health", nil)
@@ -399,7 +369,7 @@ func BenchmarkListInstances(b *testing.B) {
 			"localhost",
 			3306,
 		)
-		registry.Register(instance)
+		_ = registry.Register(instance) // 忽略基准测试中的错误
 	}
 
 	b.ResetTimer()

@@ -8,6 +8,7 @@ import (
 	"MystiSql/internal/discovery"
 	"MystiSql/internal/discovery/static"
 	"MystiSql/pkg/types"
+
 	"github.com/spf13/cobra"
 )
 
@@ -25,7 +26,7 @@ var rootCmd = &cobra.Command{
 	Use:   "mystisql",
 	Short: "MystiSql - Kubernetes 数据库访问网关",
 	Long: `MystiSql 是一个数据库访问网关，支持 MySQL、PostgreSQL、Oracle 和 Redis。
-	
+
 它提供了统一的访问接口，包括 CLI、WebUI、RESTful API、WebSocket 和 JDBC 驱动。`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// 初始化日志

@@ -23,7 +23,9 @@ func TestAPIServerLifecycle(t *testing.T) {
 	instance := types.NewDatabaseInstance("test-mysql", types.DatabaseTypeMySQL, "localhost", 3306)
 	instance.SetCredentials("root", "root")
 	instance.SetDatabase("test")
-	if err := registry.Register(instance); err != nil { t.Fatalf("注册实例失败: %v", err) }
+	if err := registry.Register(instance); err != nil {
+		t.Fatalf("注册实例失败: %v", err)
+	}
 
 	logger := zap.NewNop()
 	server := rest.NewServer(cfg, registry, logger, "test")
@@ -57,7 +59,7 @@ func TestAPIServerLifecycle(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := if err := server.Shutdown(ctx); err != nil { t.Logf("关闭服务器失败: %v", err) }; err != nil {
+	if err := server.Shutdown(ctx); err != nil {
 		t.Fatalf("关闭服务器失败: %v", err)
 	}
 
@@ -75,7 +77,9 @@ func TestAPIEndpoints(t *testing.T) {
 	instance := types.NewDatabaseInstance("test-mysql", types.DatabaseTypeMySQL, "localhost", 3306)
 	instance.SetCredentials("root", "root")
 	instance.SetDatabase("test")
-	if err := registry.Register(instance); err != nil { t.Fatalf("注册实例失败: %v", err) }
+	if err := registry.Register(instance); err != nil {
+		t.Fatalf("注册实例失败: %v", err)
+	}
 
 	logger := zap.NewNop()
 	server := rest.NewServer(cfg, registry, logger, "test")
@@ -132,5 +136,7 @@ func TestAPIEndpoints(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := server.Shutdown(ctx); err != nil { t.Logf("关闭服务器失败: %v", err) }
+	if err := server.Shutdown(ctx); err != nil {
+		t.Logf("关闭服务器失败: %v", err)
+	}
 }

@@ -1,0 +1,19 @@
+server:
+  host: "0.0.0.0"
+  port: 8080
+  mode: "debug"
+
+discovery:
+  type: "static"
+
+instances:
+  - name: "test-mysql"
+    type: "mysql"
+    host: "localhost"
+    port: 3306
+    username: "root"
+    password: "root"
+    database: "test"
+    labels:
+      environment: "test"
+      tier: "backend"

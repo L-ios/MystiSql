@@ -1,0 +1,23 @@
+# MystiSql CLI 测试配置
+instances:
+  - name: test-mysql
+    type: mysql
+    host: localhost
+    port: 3306
+    database: testdb
+    username: root
+    password: ""
+    labels:
+      env: test
+    annotations:
+      description: "测试 MySQL 实例"
+  
+  - name: test-mysql-2
+    type: mysql
+    host: 192.168.1.100
+    port: 3307
+    database: production
+    username: admin
+    password: ""
+    labels:
+      env: production

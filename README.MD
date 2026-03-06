@@ -675,12 +675,524 @@ flowchart TB
 
 ## 快速开始
 
-(待补充)
+### 安装
+
+#### 从源码编译
+
+```bash
+# 克隆仓库
+git clone https://github.com/your-org/MystiSql.git
+cd MystiSql
+
+# 编译
+go build -o bin/mystisql ./cmd/mystisql
+
+# 编译 Linux 版本
+GOOS=linux GOARCH=amd64 go build -o bin/mystisql-linux-amd64 ./cmd/mystisql
+```
+
+### 配置
+
+1. 创建配置文件 `config.yaml`：
+
+```yaml
+# 服务器配置
+server:
+  host: 0.0.0.0
+  port: 8080
+  mode: release  # debug 或 release
+
+# 服务发现配置
+discovery:
+  type: static  # static, k8s, consul
+
+# 数据库实例列表
+instances:
+  - name: local-mysql
+    type: mysql
+    host: localhost
+    port: 3306
+    username: root
+    password: root
+    database: test
+    labels:
+      environment: development
+```
+
+详细配置说明请参考 [配置说明](#配置说明) 章节。
+
+### CLI 使用示例
+
+#### 查看版本
+
+```bash
+./bin/mystisql version
+# 输出: MystiSql 0.1.0
+```
+
+#### 列出数据库实例
+
+```bash
+# 使用默认配置文件路径
+./bin/mystisql instances list
+
+# 指定配置文件
+./bin/mystisql --config config/config.yaml instances list
+
+# JSON 格式输出
+./bin/mystisql instances list --format json
+
+# CSV 格式输出
+./bin/mystisql instances list --format csv
+```
+
+输出示例（表格格式）：
+```
+NAME                      TYPE    HOST                                        PORT   DATABASE        STATUS
+local-mysql               mysql   localhost                                   3306   test            unknown
+production-mysql-master   mysql   mysql-master.production.svc.cluster.local   3306   production_db   unknown
+```
+
+#### 执行 SQL 查询
+
+```bash
+# 执行 SELECT 查询
+./bin/mystisql query --instance local-mysql "SELECT * FROM users LIMIT 5"
+
+# JSON 格式输出
+./bin/mystisql query --instance local-mysql "SELECT * FROM users LIMIT 5" --format json
+
+# 执行 INSERT
+./bin/mystisql query --instance local-mysql "INSERT INTO users (name, email) VALUES ('Alice', 'alice@example.com')"
+
+# 执行 UPDATE
+./bin/mystisql query --instance local-mysql "UPDATE users SET name='Bob' WHERE id=1"
+
+# 执行 DELETE
+./bin/mystisql query --instance local-mysql "DELETE FROM users WHERE id=1"
+```
+
+输出示例（SELECT 查询）：
+```
+id   name    email
+1    Alice   alice@example.com
+2    Bob     bob@example.com
+
+2 行数据，执行时间: 5ms
+```
+
+输出示例（INSERT/UPDATE/DELETE）：
+```
+受影响行数: 1
+最后插入ID: 123
+执行时间: 3ms
+```
+
+#### 查看实例详情
+
+```bash
+./bin/mystisql instances get local-mysql
+```
+
+输出示例：
+```
+实例名称: local-mysql
+数据库类型: mysql
+主机地址: localhost
+端口号: 3306
+数据库名: test
+用户名: root
+状态: unknown
+创建时间: 2026-03-06 10:00:00
+更新时间: 2026-03-06 10:00:00
+
+标签:
+  environment: development
+```
+
+### API 使用示例
+
+MystiSql 提供 RESTful API 接口（Phase 1 实现了基础 API 框架）。
+
+#### 健康检查
+
+```bash
+curl http://localhost:8080/health
+```
+
+响应示例：
+```json
+{
+  "status": "healthy",
+  "version": "0.1.0",
+  "timestamp": "2026-03-06T10:00:00Z"
+}
+```
+
+#### 列出实例
+
+```bash
+curl http://localhost:8080/api/v1/instances
+```
+
+响应示例：
+```json
+{
+  "instances": [
+    {
+      "name": "local-mysql",
+      "type": "mysql",
+      "host": "localhost",
+      "port": 3306,
+      "database": "test",
+      "status": "unknown",
+      "labels": {
+        "environment": "development"
+      }
+    }
+  ]
+}
+```
+
+#### 执行查询
+
+```bash
+curl -X POST http://localhost:8080/api/v1/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "instance": "local-mysql",
+    "query": "SELECT * FROM users LIMIT 5"
+  }'
+```
+
+响应示例：
+```json
+{
+  "columns": [
+    {"name": "id", "type": "int"},
+    {"name": "name", "type": "varchar"},
+    {"name": "email", "type": "varchar"}
+  ],
+  "rows": [
+    [1, "Alice", "alice@example.com"],
+    [2, "Bob", "bob@example.com"]
+  ],
+  "rowCount": 2,
+  "executionTime": 5000000
+}
+```
 
 ## 配置说明
 
-(待补充)
+### 配置文件结构
+
+MystiSql 使用 YAML 格式的配置文件，支持以下配置项：
+
+#### server - 服务器配置
+
+```yaml
+server:
+  host: 0.0.0.0        # API 服务器监听地址（默认：0.0.0.0）
+  port: 8080           # API 服务器监听端口（默认：8080）
+  mode: release        # 运行模式：debug（调试）或 release（生产）
+```
+
+**字段说明：**
+
+| 字段 | 类型 | 必填 | 默认值 | 说明 |
+|-----|------|------|--------|------|
+| host | string | 否 | 0.0.0.0 | API 服务器监听地址，0.0.0.0 表示监听所有网络接口 |
+| port | int | 否 | 8080 | API 服务器监听端口，建议使用 1024 以上的端口 |
+| mode | string | 否 | release | 运行模式，debug 会输出详细日志，release 为生产模式 |
+
+#### discovery - 服务发现配置
+
+```yaml
+discovery:
+  type: static         # 发现类型：static、k8s、consul
+```
+
+**字段说明：**
+
+| 字段 | 类型 | 必填 | 默认值 | 说明 |
+|-----|------|------|--------|------|
+| type | string | 否 | static | 服务发现类型 |
+|     |       |      |        | • static: 静态配置（从配置文件读取） |
+|     |       |      |        | • k8s: Kubernetes API 动态发现（Phase 2） |
+|     |       |      |        | • consul: Consul 服务发现（Phase 4） |
+
+#### instances - 数据库实例列表
+
+```yaml
+instances:
+  - name: local-mysql              # 实例名称（唯一标识）
+    type: mysql                    # 数据库类型
+    host: localhost                # 主机地址
+    port: 3306                     # 端口号
+    username: root                 # 用户名
+    password: root                 # 密码
+    database: test                 # 数据库名
+    labels:                        # 标签（可选）
+      environment: development
+      team: backend
+```
+
+**字段说明：**
+
+| 字段 | 类型 | 必填 | 默认值 | 说明 |
+|-----|------|------|--------|------|
+| name | string | 是 | - | 实例名称，必须唯一，用于查询时指定实例 |
+| type | string | 是 | - | 数据库类型，支持：mysql、postgresql、oracle、redis |
+| host | string | 是 | - | 数据库主机地址，可以是 IP 或域名 |
+| port | int | 是 | - | 数据库端口号 |
+| username | string | 否 | - | 数据库用户名 |
+| password | string | 否 | - | 数据库密码，建议使用环境变量 |
+| database | string | 否 | - | 默认连接的数据库名 |
+| labels | map | 否 | - | 实例标签，K8s 风格的键值对 |
+
+**支持的数据库类型：**
+
+- `mysql`: MySQL 数据库（Phase 1 支持）
+- `postgresql`: PostgreSQL 数据库（Phase 2 支持）
+- `oracle`: Oracle 数据库（Phase 2 支持）
+- `redis`: Redis 数据库（Phase 3 支持）
+
+### 环境变量覆盖
+
+可以使用环境变量覆盖配置文件中的值：
+
+```bash
+# 服务器配置
+export MYSTISQL_SERVER_HOST=0.0.0.0
+export MYSTISQL_SERVER_PORT=8080
+export MYSTISQL_SERVER_MODE=release
+
+# 服务发现配置
+export MYSTISQL_DISCOVERY_TYPE=static
+
+# 实例配置（数组索引从 0 开始）
+export MYSTISQL_INSTANCES_0_NAME=local-mysql
+export MYSTISQL_INSTANCES_0_HOST=localhost
+export MYSTISQL_INSTANCES_0_PORT=3306
+export MYSTISQL_INSTANCES_0_USERNAME=root
+export MYSTISQL_INSTANCES_0_PASSWORD=secret
+```
+
+### 配置示例
+
+#### 开发环境配置
+
+```yaml
+server:
+  host: 0.0.0.0
+  port: 8080
+  mode: debug
+
+discovery:
+  type: static
+
+instances:
+  - name: dev-mysql
+    type: mysql
+    host: localhost
+    port: 3306
+    username: root
+    password: root
+    database: dev_db
+    labels:
+      environment: development
+```
+
+#### 生产环境配置
+
+```yaml
+server:
+  host: 0.0.0.0
+  port: 8080
+  mode: release
+
+discovery:
+  type: static
+
+instances:
+  - name: production-mysql-master
+    type: mysql
+    host: mysql-master.production.svc.cluster.local
+    port: 3306
+    username: mystisql_user
+    password: ${MYSQL_MASTER_PASSWORD}  # 从环境变量读取
+    database: production_db
+    labels:
+      environment: production
+      role: master
+      
+  - name: production-mysql-slave
+    type: mysql
+    host: mysql-slave.production.svc.cluster.local
+    port: 3306
+    username: mystisql_user
+    password: ${MYSQL_SLAVE_PASSWORD}
+    database: production_db
+    labels:
+      environment: production
+      role: slave
+```
+
+### 配置文件位置
+
+MystiSql 按以下顺序查找配置文件：
+
+1. 命令行参数 `--config` 或 `-c` 指定的路径
+2. 环境变量 `MYSTISQL_CONFIG` 指定的路径
+3. 当前目录下的 `config.yaml`
+4. `/etc/mystisql/config.yaml`
 
 ## API文档
 
-(待补充)
+### API 端点
+
+Phase 1 实现了以下 API 端点：
+
+#### 健康检查
+
+**GET /health**
+
+检查服务健康状态。
+
+**请求示例：**
+```bash
+curl http://localhost:8080/health
+```
+
+**响应示例：**
+```json
+{
+  "status": "healthy",
+  "version": "0.1.0",
+  "timestamp": "2026-03-06T10:00:00Z"
+}
+```
+
+**字段说明：**
+
+| 字段 | 类型 | 说明 |
+|-----|------|------|
+| status | string | 服务状态：healthy（健康）、unhealthy（不健康） |
+| version | string | MystiSql 版本号 |
+| timestamp | string | 响应时间戳（ISO 8601 格式） |
+
+#### 列出实例
+
+**GET /api/v1/instances**
+
+获取所有已注册的数据库实例列表。
+
+**请求示例：**
+```bash
+curl http://localhost:8080/api/v1/instances
+```
+
+**响应示例：**
+```json
+{
+  "instances": [
+    {
+      "name": "local-mysql",
+      "type": "mysql",
+      "host": "localhost",
+      "port": 3306,
+      "database": "test",
+      "username": "root",
+      "status": "unknown",
+      "labels": {
+        "environment": "development"
+      },
+      "createdAt": "2026-03-06T10:00:00Z",
+      "updatedAt": "2026-03-06T10:00:00Z"
+    }
+  ]
+}
+```
+
+#### 执行查询
+
+**POST /api/v1/query**
+
+在指定数据库实例上执行 SQL 查询。
+
+**请求示例：**
+```bash
+curl -X POST http://localhost:8080/api/v1/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "instance": "local-mysql",
+    "query": "SELECT * FROM users LIMIT 5",
+    "timeout": 30
+  }'
+```
+
+**请求体字段：**
+
+| 字段 | 类型 | 必填 | 默认值 | 说明 |
+|-----|------|------|--------|------|
+| instance | string | 是 | - | 实例名称 |
+| query | string | 是 | - | SQL 查询语句 |
+| timeout | int | 否 | 30 | 超时时间（秒） |
+
+**响应示例（SELECT 查询）：**
+```json
+{
+  "columns": [
+    {"name": "id", "type": "int"},
+    {"name": "name", "type": "varchar"},
+    {"name": "email", "type": "varchar"}
+  ],
+  "rows": [
+    [1, "Alice", "alice@example.com"],
+    [2, "Bob", "bob@example.com"]
+  ],
+  "rowCount": 2,
+  "executionTime": 5000000
+}
+```
+
+**响应示例（INSERT/UPDATE/DELETE）：**
+```json
+{
+  "rowsAffected": 1,
+  "lastInsertId": 123,
+  "executionTime": 3000000
+}
+```
+
+### 错误响应
+
+当请求失败时，API 会返回错误信息：
+
+**响应格式：**
+```json
+{
+  "error": "错误描述",
+  "code": "ERROR_CODE",
+  "details": "详细错误信息"
+}
+```
+
+**常见错误码：**
+
+| HTTP 状态码 | 错误码 | 说明 |
+|-----------|--------|------|
+| 400 | INVALID_REQUEST | 请求参数无效 |
+| 404 | INSTANCE_NOT_FOUND | 实例不存在 |
+| 500 | INTERNAL_ERROR | 内部错误 |
+| 503 | SERVICE_UNAVAILABLE | 服务不可用 |
+
+### CORS 支持
+
+API 支持 CORS（跨域资源共享），允许从 Web 前端调用：
+
+```
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Methods: GET, POST, OPTIONS
+Access-Control-Allow-Headers: Content-Type
+```

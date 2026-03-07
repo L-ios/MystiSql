@@ -10,6 +10,29 @@ server:
 # 服务发现配置
 discovery:
   type: static         # 发现类型：static（静态配置）、k8s（K8s API）、consul（Consul）
+  # K8s 发现配置
+  k8s:
+    namespace: default   # K8s 命名空间
+    labelSelector: "app=database"  # 标签选择器
+    portMapping:         # 端口映射
+      mysql: 3306
+      postgresql: 5432
+      oracle: 1521
+      redis: 6379
+
+# 健康监控配置
+health:
+  enabled: true         # 是否启用健康监控
+  interval: 30s         # 监控间隔
+
+# 连接池配置
+pool:
+  maxConnections: 10    # 最大连接数
+  minConnections: 2     # 最小连接数
+  maxIdleTime: 30s      # 最大空闲时间
+  maxLifetime: 1h       # 最大生命周期
+  connectionTimeout: 10s # 连接超时时间
+  pingInterval: 30s     # 健康检查间隔
 
 # 数据库实例列表
 # 支持的数据库类型：mysql、postgresql、oracle、redis

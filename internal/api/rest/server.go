@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"MystiSql/internal/discovery"
+	"MystiSql/internal/service/query"
 	"MystiSql/pkg/types"
 
 	"github.com/gin-gonic/gin"
@@ -20,6 +21,7 @@ import (
 type Server struct {
 	config   *types.ServerConfig
 	registry discovery.InstanceRegistry
+	engine   *query.Engine
 	logger   *zap.Logger
 	server   *http.Server
 	router   *gin.Engine
@@ -28,10 +30,11 @@ type Server struct {
 }
 
 // NewServer 创建新的 REST API 服务器
-func NewServer(config *types.ServerConfig, registry discovery.InstanceRegistry, logger *zap.Logger, version string) *Server {
+func NewServer(config *types.ServerConfig, registry discovery.InstanceRegistry, engine *query.Engine, logger *zap.Logger, version string) *Server {
 	return &Server{
 		config:   config,
 		registry: registry,
+		engine:   engine,
 		logger:   logger,
 		version:  version,
 	}
@@ -54,7 +57,7 @@ func (s *Server) Setup() error {
 	s.router = gin.New()
 
 	// 创建处理器
-	s.handlers = NewHandlers(s.registry, s.logger, s.version)
+	s.handlers = NewHandlers(s.registry, s.engine, s.logger, s.version)
 
 	// 添加中间件（顺序很重要）
 	s.router.Use(RecoveryMiddleware(s.logger)) // 错误恢复（最外层）
@@ -92,9 +95,12 @@ func (s *Server) setupRoutes() {
 	{
 		// 实例相关端点
 		v1.GET("/instances", s.handlers.ListInstances)
+		v1.GET("/instances/:name/health", s.handlers.GetInstanceHealth)
+		v1.GET("/instances/:name/pool", s.handlers.GetPoolStats)
 
 		// 查询端点
 		v1.POST("/query", s.handlers.Query)
+		v1.POST("/exec", s.handlers.Exec)
 	}
 }
 

@@ -73,11 +73,17 @@ func TestNewConnection(t *testing.T) {
 		t.Fatal("NewConnection() returned nil")
 	}
 
-	if conn.instance != instance {
+	// 转换为具体类型以访问私有字段
+	mysqlConn, ok := conn.(*Connection)
+	if !ok {
+		t.Fatal("conn 不是 *Connection 类型")
+	}
+
+	if mysqlConn.instance != instance {
 		t.Error("实例未正确设置")
 	}
 
-	if conn.db != nil {
+	if mysqlConn.db != nil {
 		t.Error("新连接的 db 应该为 nil")
 	}
 }

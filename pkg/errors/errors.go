@@ -33,6 +33,9 @@ var (
 
 	// ErrQueryTimeout 查询超时
 	ErrQueryTimeout = errors.New("查询超时")
+
+	// ErrResultSetClosed 结果集已关闭
+	ErrResultSetClosed = errors.New("结果集已关闭")
 )
 
 // 配置相关错误

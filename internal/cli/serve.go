@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"MystiSql/internal/api/rest"
+	"MystiSql/internal/service/query"
+
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -46,8 +48,11 @@ var serveCmd = &cobra.Command{
 
 		GetSugar().Info("MystiSql API 服务器启动中...")
 
+		// 创建 query engine
+		engine := query.NewEngine(GetRegistry())
+
 		// 创建并初始化 API 服务器
-		server := rest.NewServer(&cfg.Server, GetRegistry(), logger, Version)
+		server := rest.NewServer(&cfg.Server, GetRegistry(), engine, logger, Version)
 		if err := server.Setup(); err != nil {
 			return fmt.Errorf("初始化服务器失败: %w", err)
 		}

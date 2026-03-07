@@ -3,6 +3,7 @@ package rest
 import (
 	"time"
 
+	"MystiSql/internal/connection"
 	"MystiSql/pkg/types"
 )
 
@@ -77,10 +78,31 @@ type ExecResponse struct {
 	Error         *ErrorDetail    `json:"error,omitempty"` // 错误详情
 }
 
+// ExecRequest 执行请求
+type ExecRequest struct {
+	Instance string `json:"instance" binding:"required"` // 实例名称（必填）
+	SQL      string `json:"sql" binding:"required"`      // SQL 语句（必填）
+	Timeout  int    `json:"timeout,omitempty"`           // 超时时间（秒），可选
+}
+
 // ExecResultData 执行结果数据
 type ExecResultData struct {
-	RowsAffected int64 `json:"rowsAffected"` // 受影响的行数
+	AffectedRows int64 `json:"affectedRows"` // 受影响的行数
 	LastInsertID int64 `json:"lastInsertId"` // 最后插入的 ID
+}
+
+// InstanceHealthResponse 实例健康状态响应
+type InstanceHealthResponse struct {
+	Instance  string    `json:"instance"`  // 实例名称
+	Status    string    `json:"status"`    // 健康状态
+	Timestamp time.Time `json:"timestamp"` // 时间戳
+}
+
+// PoolStatsResponse 连接池统计信息响应
+type PoolStatsResponse struct {
+	Instance  string               `json:"instance"`  // 实例名称
+	Stats     connection.PoolStats `json:"stats"`     // 连接池统计信息
+	Timestamp time.Time            `json:"timestamp"` // 时间戳
 }
 
 // ErrorResponse 错误响应

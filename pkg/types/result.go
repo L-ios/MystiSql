@@ -16,6 +16,7 @@ type QueryResult struct {
 	Columns       []ColumnInfo  `json:"columns"`       // 列信息
 	Rows          []Row         `json:"rows"`          // 行数据
 	RowCount      int           `json:"rowCount"`      // 行数
+	Truncated     bool          `json:"truncated"`     // 结果是否被截断
 	ExecutionTime time.Duration `json:"executionTime"` // 执行时间
 }
 
@@ -25,6 +26,7 @@ func NewQueryResult(columns []ColumnInfo, rows []Row, execTime time.Duration) *Q
 		Columns:       columns,
 		Rows:          rows,
 		RowCount:      len(rows),
+		Truncated:     false,
 		ExecutionTime: execTime,
 	}
 }

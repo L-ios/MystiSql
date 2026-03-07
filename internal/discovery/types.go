@@ -6,6 +6,26 @@ import (
 	"MystiSql/pkg/types"
 )
 
+// DiscoveryEventType 定义发现事件类型
+type DiscoveryEventType string
+
+const (
+	// EventTypeAdd 添加实例事件
+	EventTypeAdd DiscoveryEventType = "add"
+	// EventTypeUpdate 更新实例事件
+	EventTypeUpdate DiscoveryEventType = "update"
+	// EventTypeDelete 删除实例事件
+	EventTypeDelete DiscoveryEventType = "delete"
+)
+
+// DiscoveryEvent 定义发现事件
+type DiscoveryEvent struct {
+	// Type 事件类型
+	Type DiscoveryEventType
+	// Instance 数据库实例
+	Instance *types.DatabaseInstance
+}
+
 // InstanceDiscoverer 定义服务发现接口
 // 所有发现实现（静态、K8s、Consul 等）都必须实现此接口
 type InstanceDiscoverer interface {
@@ -15,6 +35,14 @@ type InstanceDiscoverer interface {
 	// Discover 发现并返回数据库实例列表
 	// ctx 用于取消操作和超时控制
 	Discover(ctx context.Context) ([]*types.DatabaseInstance, error)
+
+	// Watch 监听实例变化事件
+	// ctx 用于取消操作
+	// 返回事件通道和错误
+	Watch(ctx context.Context) (<-chan DiscoveryEvent, error)
+
+	// Stop 停止发现器
+	Stop() error
 }
 
 // InstanceRegistry 定义实例注册中心接口

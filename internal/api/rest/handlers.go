@@ -6,9 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"MystiSql/internal/connection"
-	"MystiSql/internal/connection/mysql"
 	"MystiSql/internal/discovery"
+	"MystiSql/internal/service/query"
 	"MystiSql/pkg/types"
 
 	"github.com/gin-gonic/gin"
@@ -18,14 +17,16 @@ import (
 // Handlers API 处理器
 type Handlers struct {
 	registry discovery.InstanceRegistry
+	engine   *query.Engine
 	logger   *zap.Logger
 	version  string
 }
 
 // NewHandlers 创建新的处理器
-func NewHandlers(registry discovery.InstanceRegistry, logger *zap.Logger, version string) *Handlers {
+func NewHandlers(registry discovery.InstanceRegistry, engine *query.Engine, logger *zap.Logger, version string) *Handlers {
 	return &Handlers{
 		registry: registry,
+		engine:   engine,
 		logger:   logger,
 		version:  version,
 	}
@@ -106,42 +107,19 @@ func (h *Handlers) checkInstancesHealth(ctx context.Context) *InstancesHealth {
 	return health
 }
 
-// pingInstance 通过建立连接检查实例健康状态
+// pingInstance 通过 query engine 检查实例健康状态
 func (h *Handlers) pingInstance(ctx context.Context, instance *types.DatabaseInstance) types.InstanceStatus {
-	// 创建连接
-	var conn connection.Connection
-	switch instance.Type {
-	case types.DatabaseTypeMySQL:
-		conn = mysql.NewConnection(instance)
-	default:
-		return types.InstanceStatusUnknown
-	}
-
-	// 尝试连接
-	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	if err := conn.Connect(pingCtx); err != nil {
-		h.logger.Warn("Failed to connect to instance",
-			zap.String("instance", instance.Name),
-			zap.Error(err),
-		)
-		return types.InstanceStatusUnhealthy
-	}
-	defer func() {
-		_ = conn.Close()
-	}()
-
-	// Ping 测试
-	if err := conn.Ping(pingCtx); err != nil {
-		h.logger.Warn("Failed to ping instance",
+	// 使用 query engine 进行健康检查
+	status, err := h.engine.GetInstanceHealth(ctx, instance.Name)
+	if err != nil {
+		h.logger.Warn("Failed to check instance health",
 			zap.String("instance", instance.Name),
 			zap.Error(err),
 		)
 		return types.InstanceStatusUnhealthy
 	}
 
-	return types.InstanceStatusHealthy
+	return status
 }
 
 // ListInstances 列出所有实例
@@ -185,16 +163,6 @@ func (h *Handlers) Query(c *gin.Context) {
 		return
 	}
 
-	// 获取实例
-	instance, err := h.registry.GetInstance(req.Instance)
-	if err != nil {
-		c.JSON(http.StatusNotFound, NewErrorResponse(
-			"INSTANCE_NOT_FOUND",
-			fmt.Sprintf("Instance '%s' not found", req.Instance),
-		))
-		return
-	}
-
 	// 设置超时
 	timeout := 30 * time.Second // 默认 30 秒
 	if req.Timeout > 0 {
@@ -204,43 +172,14 @@ func (h *Handlers) Query(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
 	defer cancel()
 
-	// 创建连接
-	var conn connection.Connection
-	switch instance.Type {
-	case types.DatabaseTypeMySQL:
-		conn = mysql.NewConnection(instance)
-	default:
-		c.JSON(http.StatusBadRequest, NewErrorResponse(
-			"UNSUPPORTED_DATABASE",
-			fmt.Sprintf("Unsupported database type: %s", instance.Type),
-		))
-		return
-	}
-
-	// 建立连接
-	if err := conn.Connect(ctx); err != nil {
-		h.logger.Error("Failed to connect to database",
-			zap.String("instance", instance.Name),
-			zap.Error(err),
-		)
-		c.JSON(http.StatusInternalServerError, NewErrorResponse(
-			"CONNECTION_FAILED",
-			fmt.Sprintf("Failed to connect to database: %v", err),
-		))
-		return
-	}
-	defer func() {
-		_ = conn.Close()
-	}()
-
 	// 执行查询
 	start := time.Now()
-	result, err := conn.Query(ctx, req.SQL)
+	result, err := h.engine.ExecuteQuery(ctx, req.Instance, req.SQL)
 	execTime := time.Since(start)
 
 	if err != nil {
 		h.logger.Error("Query failed",
-			zap.String("instance", instance.Name),
+			zap.String("instance", req.Instance),
 			zap.String("sql", req.SQL),
 			zap.Error(err),
 		)
@@ -264,5 +203,117 @@ func (h *Handlers) Query(c *gin.Context) {
 			Rows:     result.Rows,
 			RowCount: result.RowCount,
 		},
+	})
+}
+
+// Exec 执行非查询语句
+// POST /api/v1/exec
+func (h *Handlers) Exec(c *gin.Context) {
+	// 解析请求
+	var req ExecRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, NewErrorResponse(
+			"INVALID_REQUEST",
+			fmt.Sprintf("Invalid request: %v", err),
+		))
+		return
+	}
+
+	// 设置超时
+	timeout := 30 * time.Second // 默认 30 秒
+	if req.Timeout > 0 {
+		timeout = time.Duration(req.Timeout) * time.Second
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
+	defer cancel()
+
+	// 执行更新
+	start := time.Now()
+	result, err := h.engine.ExecuteExec(ctx, req.Instance, req.SQL)
+	execTime := time.Since(start)
+
+	if err != nil {
+		h.logger.Error("Exec failed",
+			zap.String("instance", req.Instance),
+			zap.String("sql", req.SQL),
+			zap.Error(err),
+		)
+		c.JSON(http.StatusInternalServerError, &ExecResponse{
+			Success:       false,
+			ExecutionTime: execTime,
+			Error: &ErrorDetail{
+				Code:    "EXEC_FAILED",
+				Message: fmt.Sprintf("Exec failed: %v", err),
+			},
+		})
+		return
+	}
+
+	// 返回成功响应
+	c.JSON(http.StatusOK, &ExecResponse{
+		Success:       true,
+		ExecutionTime: execTime,
+		Data: &ExecResultData{
+			AffectedRows: result.RowsAffected,
+			LastInsertID: result.LastInsertID,
+		},
+	})
+}
+
+// GetInstanceHealth 获取实例健康状态
+// GET /api/v1/instances/:name/health
+func (h *Handlers) GetInstanceHealth(c *gin.Context) {
+	instanceName := c.Param("name")
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+	defer cancel()
+
+	// 获取实例健康状态
+	status, err := h.engine.GetInstanceHealth(ctx, instanceName)
+	if err != nil {
+		h.logger.Error("Failed to get instance health",
+			zap.String("instance", instanceName),
+			zap.Error(err),
+		)
+		c.JSON(http.StatusInternalServerError, NewErrorResponse(
+			"HEALTH_CHECK_FAILED",
+			fmt.Sprintf("Failed to get instance health: %v", err),
+		))
+		return
+	}
+
+	// 返回响应
+	c.JSON(http.StatusOK, &InstanceHealthResponse{
+		Instance:  instanceName,
+		Status:    string(status),
+		Timestamp: time.Now(),
+	})
+}
+
+// GetPoolStats 获取连接池统计信息
+// GET /api/v1/instances/:name/pool
+func (h *Handlers) GetPoolStats(c *gin.Context) {
+	instanceName := c.Param("name")
+
+	// 获取连接池统计信息
+	stats, err := h.engine.GetPoolStats(instanceName)
+	if err != nil {
+		h.logger.Error("Failed to get pool stats",
+			zap.String("instance", instanceName),
+			zap.Error(err),
+		)
+		c.JSON(http.StatusInternalServerError, NewErrorResponse(
+			"POOL_STATS_FAILED",
+			fmt.Sprintf("Failed to get pool stats: %v", err),
+		))
+		return
+	}
+
+	// 返回响应
+	c.JSON(http.StatusOK, &PoolStatsResponse{
+		Instance:  instanceName,
+		Stats:     *stats,
+		Timestamp: time.Now(),
 	})
 }

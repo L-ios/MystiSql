@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"time"
 
+	"MystiSql/internal/connection"
 	"MystiSql/pkg/errors"
 	"MystiSql/pkg/types"
+
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -17,8 +19,21 @@ type Connection struct {
 	db       *sql.DB
 }
 
+// Factory MySQL 连接工厂
+type Factory struct{}
+
+// NewFactory 创建一个新的 MySQL 连接工厂
+func NewFactory() connection.ConnectionFactory {
+	return &Factory{}
+}
+
+// CreateConnection 创建一个新的 MySQL 连接
+func (f *Factory) CreateConnection(instance *types.DatabaseInstance) (connection.Connection, error) {
+	return NewConnection(instance), nil
+}
+
 // NewConnection 创建一个新的 MySQL 连接
-func NewConnection(instance *types.DatabaseInstance) *Connection {
+func NewConnection(instance *types.DatabaseInstance) connection.Connection {
 	return &Connection{
 		instance: instance,
 	}

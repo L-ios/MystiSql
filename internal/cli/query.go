@@ -10,8 +10,9 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"MystiSql/internal/connection/mysql"
+	"MystiSql/internal/service/query"
 	"MystiSql/pkg/types"
+
 	"github.com/spf13/cobra"
 )
 
@@ -41,30 +42,14 @@ var queryCmd = &cobra.Command{
 		instanceName := args[0]
 		sqlQuery := args[1]
 
-		// 获取实例
-		instance, err := GetRegistry().GetInstance(instanceName)
-		if err != nil {
-			return fmt.Errorf("获取实例失败: %w", err)
-		}
-
 		GetSugar().Debugf("在实例 %s 上执行查询: %s", instanceName, sqlQuery)
 
-		// 创建连接
-		conn := mysql.NewConnection(instance)
+		// 创建 query engine
+		engine := query.NewEngine(GetRegistry())
 
 		// 创建带超时的上下文
 		ctx, cancel := context.WithTimeout(GetContext(), queryTimeout)
 		defer cancel()
-
-		// 建立连接
-		if err := conn.Connect(ctx); err != nil {
-			return fmt.Errorf("连接数据库失败: %w", err)
-		}
-		defer func() {
-			_ = conn.Close()
-		}()
-
-		GetSugar().Debug("数据库连接已建立")
 
 		// 判断是查询还是执行语句
 		upperQuery := strings.ToUpper(strings.TrimSpace(sqlQuery))
@@ -76,15 +61,15 @@ var queryCmd = &cobra.Command{
 		var result interface{}
 		if isQuery {
 			// 执行查询
-			queryResult, err := conn.Query(ctx, sqlQuery)
+			queryResult, err := engine.ExecuteQuery(ctx, instanceName, sqlQuery)
 			if err != nil {
 				return fmt.Errorf("执行查询失败: %w", err)
 			}
 			result = queryResult
-			GetSugar().Debugf("查询完成，返回 %d 行，耗时 %v", queryResult.RowCount, queryResult.ExecutionTime)
+			GetSugar().Debugf("查询完成，返回 %d 行，耗时 %v", len(queryResult.Rows), queryResult.ExecutionTime)
 		} else {
 			// 执行非查询语句
-			execResult, err := conn.Exec(ctx, sqlQuery)
+			execResult, err := engine.ExecuteExec(ctx, instanceName, sqlQuery)
 			if err != nil {
 				return fmt.Errorf("执行语句失败: %w", err)
 			}
@@ -224,7 +209,7 @@ func outputExecResultCSV(result *types.ExecResult) error {
 	defer writer.Flush()
 
 	// 写入表头
-	if err := writer.Write([]string{"rows_affected", "last_insert_id", "execution_time"}); err != nil {
+	if err := writer.Write([]string{"affected_rows", "last_insert_id", "execution_time"}); err != nil {
 		return fmt.Errorf("写入 CSV 表头失败: %w", err)
 	}
 

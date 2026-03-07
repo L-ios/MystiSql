@@ -53,5 +53,18 @@ func (d *Discoverer) Discover(ctx context.Context) ([]*types.DatabaseInstance, e
 	return instances, nil
 }
 
+// Watch 监听实例变化事件（静态发现器不支持）
+func (d *Discoverer) Watch(ctx context.Context) (<-chan discovery.DiscoveryEvent, error) {
+	// 静态发现器不支持动态变化，返回一个关闭的通道
+	ch := make(chan discovery.DiscoveryEvent)
+	close(ch)
+	return ch, nil
+}
+
+// Stop 停止发现器（静态发现器不需要停止）
+func (d *Discoverer) Stop() error {
+	return nil
+}
+
 // Ensure Discoverer implements InstanceDiscoverer interface
 var _ discovery.InstanceDiscoverer = (*Discoverer)(nil)

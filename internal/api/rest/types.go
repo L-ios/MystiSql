@@ -141,3 +141,63 @@ func ToInstanceResponse(instance *types.DatabaseInstance) InstanceResponse {
 		Labels:   instance.Labels,
 	}
 }
+
+// GenerateTokenRequest 生成 Token 请求
+type GenerateTokenRequest struct {
+	UserID string `json:"user_id" binding:"required"` // 用户 ID（必填）
+	Role   string `json:"role" binding:"required"`    // 角色（必填）
+}
+
+// GenerateTokenResponse 生成 Token 响应
+type GenerateTokenResponse struct {
+	Success bool                   `json:"success"`         // 是否成功
+	Data    *TokenData             `json:"data,omitempty"`  // Token 数据
+	Error   *ErrorDetail           `json:"error,omitempty"` // 错误详情
+}
+
+// TokenData Token 数据
+type TokenData struct {
+	Token     string    `json:"token"`     // JWT Token
+	TokenID   string    `json:"tokenId"`   // Token ID
+	ExpiresAt time.Time `json:"expiresAt"` // 过期时间
+	IssuedAt  time.Time `json:"issuedAt"`  // 签发时间
+	UserID    string    `json:"userId"`    // 用户 ID
+	Role      string    `json:"role"`      // 角色
+}
+
+// RevokeTokenRequest 撤销 Token 请求
+type RevokeTokenRequest struct {
+	Token string `json:"token" binding:"required"` // 要撤销的 Token（必填）
+}
+
+// RevokeTokenResponse 撤销 Token 响应
+type RevokeTokenResponse struct {
+	Success bool         `json:"success"`         // 是否成功
+	Message string       `json:"message"`         // 消息
+	Error   *ErrorDetail `json:"error,omitempty"` // 错误详情
+}
+
+// TokenInfoResponse Token 信息响应
+type TokenInfoResponse struct {
+	Success   bool         `json:"success"`         // 是否成功
+	UserID    string       `json:"userId"`    // 用户 ID
+	Role      string       `json:"role"`      // 角色
+	TokenID   string       `json:"tokenId"`   // Token ID
+	ExpiresAt time.Time    `json:"expiresAt"` // 过期时间
+	IssuedAt  time.Time    `json:"issuedAt"`  // 签发时间
+	Error     *ErrorDetail `json:"error,omitempty"` // 错误详情
+}
+
+// TokensListResponse Token 列表响应
+type TokensListResponse struct {
+	Success         bool                     `json:"success"`         // 是否成功
+	RevokedTokens   []RevokedTokenInfo       `json:"revokedTokens"`   // 已撤销的 Token 列表
+	Error           *ErrorDetail             `json:"error,omitempty"` // 错误详情
+}
+
+// RevokedTokenInfo 已撤销的 Token 信息
+type RevokedTokenInfo struct {
+	Token       string    `json:"token"`       // Token（脱敏）
+	Reason      string    `json:"reason"`      // 撤销原因
+	RevokedAt   time.Time `json:"revokedAt"`   // 撤销时间
+}

@@ -9,7 +9,9 @@ import (
 	"syscall"
 	"time"
 
+	"MystiSql/internal/api/middleware"
 	"MystiSql/internal/discovery"
+	"MystiSql/internal/service/auth"
 	"MystiSql/internal/service/query"
 	"MystiSql/pkg/types"
 
@@ -19,24 +21,27 @@ import (
 
 // Server REST API 服务器
 type Server struct {
-	config   *types.ServerConfig
-	registry discovery.InstanceRegistry
-	engine   *query.Engine
-	logger   *zap.Logger
-	server   *http.Server
-	router   *gin.Engine
-	handlers *Handlers
-	version  string
+	config       *types.ServerConfig
+	registry     discovery.InstanceRegistry
+	engine       *query.Engine
+	authService  *auth.AuthService
+	logger       *zap.Logger
+	server       *http.Server
+	router       *gin.Engine
+	handlers     *Handlers
+	authHandlers *AuthHandlers
+	version      string
 }
 
 // NewServer 创建新的 REST API 服务器
-func NewServer(config *types.ServerConfig, registry discovery.InstanceRegistry, engine *query.Engine, logger *zap.Logger, version string) *Server {
+func NewServer(config *types.ServerConfig, registry discovery.InstanceRegistry, engine *query.Engine, authService *auth.AuthService, logger *zap.Logger, version string) *Server {
 	return &Server{
-		config:   config,
-		registry: registry,
-		engine:   engine,
-		logger:   logger,
-		version:  version,
+		config:      config,
+		registry:    registry,
+		engine:      engine,
+		authService: authService,
+		logger:      logger,
+		version:     version,
 	}
 }
 
@@ -58,6 +63,9 @@ func (s *Server) Setup() error {
 
 	// 创建处理器
 	s.handlers = NewHandlers(s.registry, s.engine, s.logger, s.version)
+	if s.authService != nil {
+		s.authHandlers = NewAuthHandlers(s.authService, s.logger)
+	}
 
 	// 添加中间件（顺序很重要）
 	s.router.Use(RecoveryMiddleware(s.logger)) // 错误恢复（最外层）
@@ -90,9 +98,31 @@ func (s *Server) setupRoutes() {
 	// 健康检查端点（不需要版本前缀）
 	s.router.GET("/health", s.handlers.Health)
 
+	// 认证中间件（如果启用）
+	var authMiddleware gin.HandlerFunc
+	if s.authService != nil {
+		authMiddleware = middleware.AuthMiddleware(s.authService, s.logger)
+	}
+
 	// API v1 路由组
 	v1 := s.router.Group("/api/v1")
 	{
+		// 认证相关端点（不需要认证）
+		if s.authHandlers != nil {
+			auth := v1.Group("/auth")
+			{
+				auth.POST("/token", s.authHandlers.GenerateToken)
+				auth.DELETE("/token", s.authHandlers.RevokeToken)
+				auth.GET("/tokens", s.authHandlers.ListTokens)
+				auth.GET("/token/info", s.authHandlers.GetTokenInfo)
+			}
+		}
+
+		// 需要认证的端点
+		if authMiddleware != nil {
+			v1.Use(authMiddleware)
+		}
+
 		// 实例相关端点
 		v1.GET("/instances", s.handlers.ListInstances)
 		v1.GET("/instances/:name/health", s.handlers.GetInstanceHealth)

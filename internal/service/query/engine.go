@@ -9,23 +9,28 @@ import (
 	"MystiSql/internal/connection"
 	"MystiSql/internal/connection/mysql"
 	"MystiSql/internal/connection/pool"
+	"MystiSql/internal/connection/postgresql"
 	"MystiSql/internal/discovery"
+	"MystiSql/internal/service/audit"
+	"MystiSql/internal/service/validator"
 	"MystiSql/pkg/errors"
 	"MystiSql/pkg/types"
 )
 
 type Engine struct {
-	registry  discovery.InstanceRegistry
-	parser    SQLParser
-	pools     map[string]connection.ConnectionPool
-	factories map[types.DatabaseType]connection.ConnectionFactory
-	mu        sync.RWMutex
+	registry         discovery.InstanceRegistry
+	parser           SQLParser
+	pools            map[string]connection.ConnectionPool
+	factories        map[types.DatabaseType]connection.ConnectionFactory
+	auditService     *audit.AuditService
+	validatorService *validator.ValidatorService
+	mu               sync.RWMutex
 }
 
 func NewEngine(registry discovery.InstanceRegistry) *Engine {
-	// 初始化连接工厂
 	factories := make(map[types.DatabaseType]connection.ConnectionFactory)
 	factories[types.DatabaseTypeMySQL] = mysql.NewFactory()
+	factories[types.DatabaseTypePostgreSQL] = postgresql.NewFactory()
 
 	return &Engine{
 		registry:  registry,
@@ -35,42 +40,90 @@ func NewEngine(registry discovery.InstanceRegistry) *Engine {
 	}
 }
 
+func (e *Engine) SetAuditService(service *audit.AuditService) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.auditService = service
+}
+
+func (e *Engine) SetValidatorService(service *validator.ValidatorService) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.validatorService = service
+}
+
 func (e *Engine) ExecuteQuery(ctx context.Context, instanceName, query string) (*types.QueryResult, error) {
-	// 解析 SQL 语句
+	startTime := time.Now()
+
 	parseResult, err := e.parser.Parse(query)
 	if err != nil {
 		return nil, fmt.Errorf("解析 SQL 语句失败: %w", err)
 	}
 
-	// 验证 SQL 语句
 	if err := e.parser.Validate(query); err != nil {
 		return nil, fmt.Errorf("验证 SQL 语句失败: %w", err)
 	}
 
-	// 获取连接池
+	e.mu.RLock()
+	validatorSvc := e.validatorService
+	auditSvc := e.auditService
+	e.mu.RUnlock()
+
+	if validatorSvc != nil {
+		validationResult, err := validatorSvc.Validate(ctx, instanceName, query)
+		if err != nil {
+			return nil, fmt.Errorf("SQL 验证失败: %w", err)
+		}
+		if !validationResult.Allowed {
+			return nil, fmt.Errorf("SQL 被拦截: %s", validationResult.Reason)
+		}
+	}
+
 	pool, err := e.getConnectionPool(ctx, instanceName)
 	if err != nil {
 		return nil, err
 	}
 
-	// 添加查询超时
 	ctx, cancel := WithTimeout(ctx, parseResult.QueryTimeout)
 	defer cancel()
 
-	// 获取连接
 	conn, err := pool.GetConnection(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("获取数据库连接失败: %w", err)
 	}
 	defer conn.Close()
 
-	// 执行查询
 	result, err := conn.Query(ctx, query)
+
+	if auditSvc != nil {
+		auditLog := audit.NewAuditLog(
+			getUserIDFromContext(ctx),
+			getClientIPFromContext(ctx),
+			instanceName,
+			"",
+			query,
+		)
+		var rowCount int64
+		if result != nil {
+			rowCount = int64(result.RowCount)
+		}
+		auditLog.SetQueryInfo(string(parseResult.StatementType), rowCount, time.Since(startTime).Milliseconds())
+
+		if err != nil {
+			auditLog.SetError(err.Error())
+		} else {
+			auditLog.SetSuccess()
+		}
+
+		if err := auditSvc.Log(ctx, auditLog); err != nil {
+			// Log the audit failure but don't fail the query
+		}
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("执行查询失败: %w", err)
 	}
 
-	// 限制结果集大小
 	result = WithResultSizeLimit(result, parseResult.MaxResultSize)
 
 	return result, nil

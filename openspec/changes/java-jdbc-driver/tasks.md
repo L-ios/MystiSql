@@ -23,7 +23,7 @@
   - 添加测试依赖：JUnit 5, Mockito
   - 配置JAR打包任务（包含SPI文件）
 
-- [ ] 2.3 创建Gradle wrapper
+- [x] 2.3 创建Gradle wrapper
   - 运行`gradle wrapper`生成wrapper文件
   - 配置`gradle.properties`版本信息
 
@@ -38,7 +38,7 @@
 
 ## 3. JDBC Driver接口实现
 
-- [ ] 3.1 实现MystiSqlDriver类
+- [x] 3.1 实现MystiSqlDriver类
   - 实现`java.sql.Driver`接口的所有必需方法
   - 实现`acceptsURL()`方法，识别`jdbc:mystisql://`前缀
   - 实现`connect()`方法，返回MystiSqlConnection
@@ -46,13 +46,13 @@
   - 实现`getMajorVersion()`和`getMinorVersion()`
   - 实现`jdbcCompliant()`方法（Phase 2.5返回false）
 
-- [ ] 3.2 实现URL解析逻辑
+- [x] 3.2 实现URL解析逻辑
   - 解析`jdbc:mystisql://host:port/instance?params`格式
   - 提取gateway host, port, instance name
   - 解析查询参数（timeout, ssl, token等）
   - 错误处理：无效URL格式抛出SQLException
 
-- [ ] 3.3 编写Driver单元测试
+- [x] 3.3 编写Driver单元测试
   - 测试URL解析正确性
   - 测试SPI自动注册
   - 测试acceptsURL逻辑
@@ -60,39 +60,39 @@
 
 ## 4. RESTful API客户端实现
 
-- [ ] 4.1 实现RestClient类
+- [x] 4.1 实现RestClient类
   - 封装OkHttp客户端
   - 配置连接池（默认最多20个连接）
   - 配置超时（默认30秒）
   - 支持HTTPS和证书验证配置
 
-- [ ] 4.2 实现认证集成
+- [x] 4.2 实现认证集成
   - 支持从URL参数提取token
   - 支持将password作为token使用
   - 在所有HTTP请求头中添加`Authorization: Bearer {token}`
   - 连接关闭时调用Gateway撤销token
 
-- [ ] 4.3 实现API请求模型类
+- [x] 4.3 实现API请求模型类
   - 创建`QueryRequest`类（instance, query, parameters）
   - 创建`ExecRequest`类（instance, sql）
   - 创建`Parameter`类（type, value）
 
-- [ ] 4.4 实现API响应模型类
+- [x] 4.4 实现API响应模型类
   - 创建`QueryResponse`类（columns, rows, rowCount）
   - 创建`ExecResponse`类（rowsAffected, lastInsertId）
   - 创建`ErrorResponse`类（error, code）
 
-- [ ] 4.5 实现JSON序列化/反序列化
+- [x] 4.5 实现JSON序列化/反序列化
   - 使用Jackson进行JSON转换
   - 处理日期时间类型的序列化（ISO 8601格式）
   - 处理NULL值
 
-- [ ] 4.6 实现错误码到SQLState的映射
+- [x] 4.6 实现错误码到SQLState的映射
   - 创建`ErrorCodeMapper`类
   - 映射Gateway错误码到标准SQLState
   - 处理未知错误码（使用HY000）
 
-- [ ] 4.7 编写RestClient单元测试
+- [x] 4.7 编写RestClient单元测试
   - 使用MockWebServer模拟Gateway
   - 测试各种HTTP请求场景
   - 测试认证token传递

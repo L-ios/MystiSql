@@ -66,7 +66,7 @@
 - [x] 7.5 支持 PostgreSQL 特有配置（sslmode、connectTimeout）
 - [x] 7.6 实现 PostgreSQL 错误处理（唯一约束、外键约束）
 - [x] 7.7 编写 PostgreSQL 连接单元测试
-- [ ] 7.8 编写 PostgreSQL 集成测试（需要真实 PostgreSQL 实例）
+- [x] 7.8 编写 PostgreSQL 集成测试（需要真实 PostgreSQL 实例）
 
 ## 8. WebSocket 支持
 
@@ -76,11 +76,11 @@
 - [x] 8.4 实现 WebSocket 连接管理（最大连接数、空闲超时）
 - [x] 8.5 实现心跳机制（ping/pong）
 - [x] 8.6 实现 WebSocket 端点：ws://host:port/ws
-- [ ] 8.7 编写 WebSocket 单元测试
+- [x] 8.7 编写 WebSocket 单元测试
 
 ## 9. JDBC 事务管理
 
-- [ ] 9.1 实现事务上下文管理（connectionId 绑定）
+- [x] 9.1 实现事务上下文管理（connectionId 绑定）
 - [ ] 9.2 实现 REST API：POST /api/v1/transaction/begin（开始事务）
 - [ ] 9.3 实现事务查询执行（携带 connectionId 的请求使用同一连接）
 - [ ] 9.4 实现 REST API：POST /api/v1/transaction/commit（提交事务）
@@ -113,11 +113,11 @@
 
 ## 12. 配置和文档更新
 
-- [ ] 12.1 更新 README.MD 文档（添加 Phase 3 功能说明）
+- [x] 12.1 更新 README.MD 文档（添加 Phase 3 功能说明）
 - [ ] 12.2 更新 AGENTS.md（添加 Phase 3 相关指南）
-- [ ] 12.3 创建配置示例文件（包含认证、审计、验证器配置）
+- [x] 12.3 创建配置示例文件（包含认证、审计、验证器配置）
 - [ ] 12.4 更新 API 文档（添加新增的 API 端点）
-- [ ] 12.5 编写 Phase 3 部署指南（启用认证、审计的步骤）
+- [x] 12.5 编写 Phase 3 部署指南（启用认证、审计的步骤）
 
 ## 13. 测试和验证
 

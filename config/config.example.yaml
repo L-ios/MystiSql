@@ -1,0 +1,193 @@
+# MystiSql Phase 3 完整配置示例
+# 
+# 本配置文件包含 Phase 1-3 的所有配置选项
+# Phase 1: 基础设施层（服务器、发现、实例）
+# Phase 2: 核心引擎层（连接池、查询引擎）
+# Phase 3: 安全控制层（认证、审计、验证器、WebSocket）
+
+# ============================================================================
+# Phase 1: 基础设施层配置
+# ============================================================================
+
+# 服务器配置
+server:
+  host: "0.0.0.0"              # API 服务器监听地址
+  port: 8080                    # API 服务器监听端口
+  mode: "release"               # 运行模式: debug 或 release
+
+# 服务发现配置
+discovery:
+  type: "static"                # 发现类型: static, k8s, consul
+
+# 数据库实例列表
+instances:
+  # MySQL 实例示例
+  - name: "production-mysql-master"
+    type: "mysql"
+    host: "mysql-master.production.svc.cluster.local"
+    port: 3306
+    username: "mystisql_user"
+    password: "${MYSQL_MASTER_PASSWORD}"  # 从环境变量读取
+    database: "production_db"
+    labels:
+      environment: "production"
+      role: "master"
+      team: "backend"
+  
+  - name: "production-mysql-slave"
+    type: "mysql"
+    host: "mysql-slave.production.svc.cluster.local"
+    port: 3306
+    username: "mystisql_user"
+    password: "${MYSQL_SLAVE_PASSWORD}"
+    database: "production_db"
+    labels:
+      environment: "production"
+      role: "slave"
+      team: "backend"
+  
+  # PostgreSQL 实例示例 (Phase 3 新增)
+  - name: "production-postgresql"
+    type: "postgresql"
+    host: "postgresql.production.svc.cluster.local"
+    port: 5432
+    username: "mystisql_user"
+    password: "${POSTGRESQL_PASSWORD}"
+    database: "production_db"
+    labels:
+      environment: "production"
+      team: "analytics"
+    # PostgreSQL 特有配置
+    sslmode: "require"           # disable, require, verify-ca, verify-full
+    connectTimeout: "10s"        # 连接超时
+
+# ============================================================================
+# Phase 2: 核心引擎层配置
+# ============================================================================
+
+# 连接池配置
+pool:
+  maxOpen: 20                    # 最大打开连接数
+  maxIdle: 10                    # 最大空闲连接数
+  maxLifetime: "1h"              # 连接最大生命周期
+  maxIdleTime: "10m"             # 连接最大空闲时间
+
+# 查询引擎配置
+query:
+  timeout: "30s"                 # 查询默认超时时间
+  maxRows: 10000                 # 结果集最大行数
+  schemaCache:
+    enabled: true                # 是否启用 Schema 缓存
+    ttl: "1h"                    # 缓存 TTL
+
+# ============================================================================
+# Phase 3: 安全控制层配置
+# ============================================================================
+
+# Token 认证配置
+auth:
+  enabled: true                  # 是否启用认证
+  token:
+    secret: "${AUTH_TOKEN_SECRET}"  # JWT 签名密钥（必须从环境变量读取！）
+    expire: "24h"                # Token 默认过期时间
+  
+  # 认证白名单路径（无需 Token）
+  whitelist:
+    - "/health"                  # 健康检查
+    - "/metrics"                 # Prometheus 指标
+    - "/api/v1/auth/login"       # 登录接口
+  
+  # Token 刷新配置（Phase 4）
+  refresh:
+    enabled: false
+    maxRefresh: "168h"           # 最长刷新时间（7天）
+
+# 审计日志配置
+audit:
+  enabled: true                  # 是否启用审计日志
+  logFile: "/var/log/mystisql/audit.log"  # 审计日志文件路径
+  retentionDays: 30             # 日志保留天数
+  
+  # 日志轮转配置
+  rotation:
+    enabled: true                # 是否启用日志轮转
+    maxSize: "100MB"             # 单个日志文件最大大小
+    compress: true               # 是否压缩旧日志
+
+# SQL 验证器配置
+validator:
+  enabled: true                  # 是否启用 SQL 验证
+  
+  # 危险操作检测
+  dangerousOperations:
+    - "DROP"                     # 拦截 DROP 操作
+    - "TRUNCATE"                 # 拦截 TRUNCATE 操作
+    - "DELETE_WITHOUT_WHERE"     # 拦截无 WHERE 的 DELETE
+    - "UPDATE_WITHOUT_WHERE"     # 拦截无 WHERE 的 UPDATE
+  
+  # SQL 白名单（正则表达式，允许的 SQL 模式）
+  whitelist:
+    # 允许访问系统配置表
+    - "^SELECT .* FROM system_config"
+    # 允许查看用户信息（受限）
+    - "^SELECT id, name, email FROM users WHERE id = \\?"
+  
+  # SQL 黑名单（正则表达式，禁止的 SQL 模式）
+  blacklist:
+    # 禁止访问审计日志表
+    - ".*audit_log.*"
+    # 禁止访问系统用户表
+    - ".*system_users.*"
+  
+  # 配置持久化文件路径
+  configFile: "/etc/mystisql/validator.yaml"
+
+# WebSocket 配置
+websocket:
+  enabled: true                  # 是否启用 WebSocket
+  maxConnections: 1000           # 最大连接数
+  idleTimeout: "10m"             # 空闲连接超时时间
+  maxConcurrentQueries: 5        # 单个连接最大并发查询数
+  
+  # 心跳配置
+  heartbeat:
+    enabled: true                # 是否启用心跳
+    interval: "30s"              # 心跳间隔
+    timeout: "1m"                # 心跳超时时间
+
+# JDBC 事务配置（Phase 3 部分实现）
+transaction:
+  enabled: true                  # 是否启用事务支持
+  defaultTimeout: "5m"           # 事务默认超时时间
+  maxTimeout: "30m"              # 事务最大超时时间
+  maxConcurrent: 100             # 最大并发事务数
+  cleanupInterval: "1m"          # 过期事务清理间隔
+
+# ============================================================================
+# 日志配置（全局）
+# ============================================================================
+
+logging:
+  level: "info"                  # 日志级别: debug, info, warn, error
+  format: "json"                 # 日志格式: json 或 text
+  output: "/var/log/mystisql/mystisql.log"  # 日志文件路径
+  
+  # 日志轮转
+  rotation:
+    enabled: true
+    maxSize: "100MB"
+    maxBackups: 10
+    maxAge: 30                   # 保留天数
+    compress: true
+
+# ============================================================================
+# 监控配置
+# ============================================================================
+
+metrics:
+  enabled: true                  # 是否启用 Prometheus 指标
+  path: "/metrics"               # 指标端点路径
+
+health:
+  enabled: true                  # 是否启用健康检查
+  path: "/health"                # 健康检查端点路径

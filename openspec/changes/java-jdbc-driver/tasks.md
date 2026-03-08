@@ -305,32 +305,32 @@
   - `getUserName()`
   - `getURL()`
 
-- [ ] 9.3 实现getCatalogs()方法
-  - 调用`GET /api/v1/metadata/catalogs`
+- [x] 9.3 实现getCatalogs()方法
+  - 使用INFORMATION_SCHEMA.SCHEMATA查询
   - 返回ResultSet
 
-- [ ] 9.4 实现getSchemas()方法
-  - 调用`GET /api/v1/metadata/schemas`
+- [x] 9.4 实现getSchemas()方法
+  - 使用INFORMATION_SCHEMA.SCHEMATA查询
   - 支持catalog过滤参数
   - 返回ResultSet
 
-- [ ] 9.5 实现getTables()方法
-  - 调用`GET /api/v1/metadata/tables`
+- [x] 9.5 实现getTables()方法
+  - 使用INFORMATION_SCHEMA.TABLES查询
   - 支持schema、pattern、type过滤
   - 返回ResultSet包含TABLE_CAT, TABLE_SCHEM, TABLE_NAME, TABLE_TYPE, REMARKS
 
-- [ ] 9.6 实现getColumns()方法
-  - 调用`GET /api/v1/metadata/columns`
+- [x] 9.6 实现getColumns()方法
+  - 使用INFORMATION_SCHEMA.COLUMNS查询
   - 支持schema、table过滤
   - 返回ResultSet包含完整列信息
   - 将MySQL类型映射到JDBC Types
 
-- [ ] 9.7 实现getPrimaryKeys()方法
-  - 调用`GET /api/v1/metadata/primary-keys`
+- [x] 9.7 实现getPrimaryKeys()方法
+  - 使用INFORMATION_SCHEMA.KEY_COLUMN_USAGE查询
   - 返回ResultSet包含主键信息
 
-- [ ] 9.8 实现getIndexInfo()方法
-  - 调用`GET /api/v1/metadata/indexes`
+- [x] 9.8 实现getIndexInfo()方法
+  - 使用INFORMATION_SCHEMA.STATISTICS查询
   - 返回ResultSet包含索引信息
 
 - [ ] 9.9 实现元数据缓存

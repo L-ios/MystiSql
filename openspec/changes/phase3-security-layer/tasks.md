@@ -81,12 +81,12 @@
 ## 9. JDBC 事务管理
 
 - [x] 9.1 实现事务上下文管理（connectionId 绑定）
-- [ ] 9.2 实现 REST API：POST /api/v1/transaction/begin（开始事务）
-- [ ] 9.3 实现事务查询执行（携带 connectionId 的请求使用同一连接）
-- [ ] 9.4 实现 REST API：POST /api/v1/transaction/commit（提交事务）
-- [ ] 9.5 实现 REST API：POST /api/v1/transaction/rollback（回滚事务）
-- [ ] 9.6 实现事务超时自动回滚（默认 5 分钟）
-- [ ] 9.7 实现事务隔离级别配置
+- [x] 9.2 实现 REST API：POST /api/v1/transaction/begin（开始事务）
+- [x] 9.3 实现事务查询执行（携带 connectionId 的请求使用同一连接）
+- [x] 9.4 实现 REST API：POST /api/v1/transaction/commit（提交事务）
+- [x] 9.5 实现 REST API：POST /api/v1/transaction/rollback（回滚事务）
+- [x] 9.6 实现事务超时自动回滚（默认 5 分钟）
+- [x] 9.7 实现事务隔离级别配置
 - [ ] 9.8 编写事务管理单元测试
 
 ## 10. JDBC 批量操作

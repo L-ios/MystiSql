@@ -100,46 +100,46 @@
 
 ## 5. JDBC Connection接口实现
 
-- [ ] 5.1 实现MystiSqlConnection类
+- [x] 5.1 实现MystiSqlConnection类
   - 实现`java.sql.Connection`接口的必需方法
   - 维护连接状态（closed, autoCommit等）
   - 持有RestClient实例
   - 持有实例名称、认证token等信息
 
-- [ ] 5.2 实现createStatement()方法
+- [x] 5.2 实现createStatement()方法
   - 返回MystiSqlStatement对象
   - 关联Connection和Statement
 
-- [ ] 5.3 实现prepareStatement()方法
+- [x] 5.3 实现prepareStatement()方法
   - 返回MystiSqlPreparedStatement对象
   - 解析SQL中的`?`占位符
 
-- [ ] 5.4 实现close()方法
+- [x] 5.4 实现close()方法
   - 标记连接为closed
   - 调用Gateway撤销token（如已认证）
   - 释放RestClient资源
 
-- [ ] 5.5 实现isClosed()方法
+- [x] 5.5 实现isClosed()方法
   - 返回连接关闭状态
 
-- [ ] 5.6 实现isValid()方法
+- [x] 5.6 实现isValid()方法
   - 调用Gateway的`/health`或`/api/v1/instances/{name}/health`
   - 或执行`SELECT 1`查询
   - 返回true/false表示连接有效性
 
-- [ ] 5.7 实现getMetaData()方法
+- [x] 5.7 实现getMetaData()方法
   - 返回MystiSqlDatabaseMetaData对象
 
-- [ ] 5.8 实现auto-commit相关方法
+- [x] 5.8 实现auto-commit相关方法
   - `getAutoCommit()`返回当前状态
   - `setAutoCommit(boolean)`设置状态（Phase 2.5仅记录状态）
   - Phase 3实现真正的事务管理
 
-- [ ] 5.9 实现Connection占位方法
+- [x] 5.9 实现Connection占位方法
   - `commit()`, `rollback()`抛出SQLException（Phase 3实现）
   - `createBlob()`, `createClob()`抛出SQLFeatureNotSupportedException
 
-- [ ] 5.10 编写Connection单元测试
+- [x] 5.10 编写Connection单元测试
   - 测试Statement和PreparedStatement创建
   - 测试连接关闭和状态检查
   - 测试isValid()逻辑
@@ -147,47 +147,47 @@
 
 ## 6. JDBC Statement接口实现
 
-- [ ] 6.1 实现MystiSqlStatement类
+- [x] 6.1 实现MystiSqlStatement类
   - 实现`java.sql.Statement`接口的必需方法
   - 持有Connection实例
   - 持有当前ResultSet
 
-- [ ] 6.2 实现executeQuery()方法
+- [x] 6.2 实现executeQuery()方法
   - 调用RestClient发送`POST /api/v1/query`
   - 解析响应创建ResultSet
   - 返回ResultSet对象
 
-- [ ] 6.3 实现executeUpdate()方法
+- [x] 6.3 实现executeUpdate()方法
   - 调用RestClient发送`POST /api/v1/exec`
   - 返回受影响行数（int）
 
-- [ ] 6.4 实现executeLargeUpdate()方法
+- [x] 6.4 实现executeLargeUpdate()方法
   - 返回受影响行数（long）
   - 支持大批量操作
 
-- [ ] 6.5 实现execute()方法
+- [x] 6.5 实现execute()方法
   - 执行SQL，判断是查询还是更新
   - 返回true表示有ResultSet，false表示更新
 
-- [ ] 6.6 实现getResultSet()方法
+- [x] 6.6 实现getResultSet()方法
   - 返回当前ResultSet
 
-- [ ] 6.7 实现getUpdateCount()方法
+- [x] 6.7 实现getUpdateCount()方法
   - 返回受影响行数
 
-- [ ] 6.8 实现setQueryTimeout()方法
+- [x] 6.8 实现setQueryTimeout()方法
   - 设置Statement级别的超时
   - 覆盖Connection级别的超时设置
 
-- [ ] 6.9 实现close()方法
+- [x] 6.9 实现close()方法
   - 关闭当前ResultSet（如有）
   - 释放资源
 
-- [ ] 6.10 实现Statement占位方法
+- [x] 6.10 实现Statement占位方法
   - `addBatch()`, `executeBatch()`抛出SQLException（Phase 3）
   - 其他不常用方法抛出SQLFeatureNotSupportedException
 
-- [ ] 6.11 编写Statement单元测试
+- [x] 6.11 编写Statement单元测试
   - 测试SELECT查询
   - 测试INSERT/UPDATE/DELETE
   - 测试超时设置
@@ -195,16 +195,16 @@
 
 ## 7. JDBC ResultSet接口实现
 
-- [ ] 7.1 实现MystiSqlResultSet类
+- [x] 7.1 实现MystiSqlResultSet类
   - 实现`java.sql.ResultSet`接口的必需方法
   - 持有列信息和行数据
   - 维护当前行索引
 
-- [ ] 7.2 实现next()方法
+- [x] 7.2 实现next()方法
   - 移动光标到下一行
   - 返回true表示有更多行，false表示结束
 
-- [ ] 7.3 实现getXxx()方法（按列名）
+- [x] 7.3 实现getXxx()方法（按列名）
   - `getString(String columnName)`
   - `getInt(String columnName)`
   - `getLong(String columnName)`
@@ -214,32 +214,32 @@
   - `getTimestamp(String columnName)`
   - `getBigDecimal(String columnName)`
 
-- [ ] 7.4 实现getXxx()方法（按列索引）
+- [x] 7.4 实现getXxx()方法（按列索引）
   - 所有getXxx方法的重载版本（int columnIndex）
   - 列索引从1开始
 
-- [ ] 7.5 实现类型转换逻辑
+- [x] 7.5 实现类型转换逻辑
   - JSON值到Java类型的转换
   - 处理类型不匹配情况
   - 处理NULL值
 
-- [ ] 7.6 实现wasNull()方法
+- [x] 7.6 实现wasNull()方法
   - 检查最后读取的值是否为NULL
 
-- [ ] 7.7 实现getMetaData()方法
+- [x] 7.7 实现getMetaData()方法
   - 返回ResultSetMetaData对象
 
-- [ ] 7.8 实现findColumn()方法
+- [x] 7.8 实现findColumn()方法
   - 根据列名返回列索引
 
-- [ ] 7.9 实现close()方法
+- [x] 7.9 实现close()方法
   - 标记ResultSet为closed
   - 释放资源
 
-- [ ] 7.10 实现ResultSet占位方法
+- [x] 7.10 实现ResultSet占位方法
   - `getArray()`, `getBlob()`, `getClob()`抛出SQLFeatureNotSupportedException
 
-- [ ] 7.11 编写ResultSet单元测试
+- [x] 7.11 编写ResultSet单元测试
   - 测试光标移动
   - 测试各种类型的数据读取
   - 测试NULL值处理
@@ -247,12 +247,12 @@
 
 ## 8. JDBC PreparedStatement接口实现
 
-- [ ] 8.1 实现MystiSqlPreparedStatement类
+- [x] 8.1 实现MystiSqlPreparedStatement类
   - 实现`java.sql.PreparedStatement`接口
   - 继承Statement功能
   - 持有SQL语句和参数列表
 
-- [ ] 8.2 实现setXxx()方法
+- [x] 8.2 实现setXxx()方法
   - `setString(int, String)`
   - `setInt(int, int)`
   - `setLong(int, long)`
@@ -263,29 +263,29 @@
   - `setBigDecimal(int, BigDecimal)`
   - `setNull(int, int)`
 
-- [ ] 8.3 实现参数存储逻辑
+- [x] 8.3 实现参数存储逻辑
   - 参数按索引存储（索引从1开始）
   - 参数包含类型和值
 
-- [ ] 8.4 实现executeQuery()方法
+- [x] 8.4 实现executeQuery()方法
   - 构建参数化请求体
   - 调用RestClient发送`POST /api/v1/query`
   - 返回ResultSet
 
-- [ ] 8.5 实现executeUpdate()方法
+- [x] 8.5 实现executeUpdate()方法
   - 构建参数化请求体
   - 调用RestClient发送`POST /api/v1/exec`
   - 返回受影响行数
 
-- [ ] 8.6 实现clearParameters()方法
+- [x] 8.6 实现clearParameters()方法
   - 清空所有已设置的参数
   - PreparedStatement可复用
 
-- [ ] 8.7 实现getGeneratedKeys()方法
+- [x] 8.7 实现getGeneratedKeys()方法
   - 返回包含lastInsertId的ResultSet
   - 用于获取自增ID
 
-- [ ] 8.8 编写PreparedStatement单元测试
+- [x] 8.8 编写PreparedStatement单元测试
   - 测试参数设置
   - 测试参数化查询执行
   - 测试参数清除和复用
@@ -293,11 +293,11 @@
 
 ## 9. JDBC DatabaseMetaData接口实现
 
-- [ ] 9.1 实现MystiSqlDatabaseMetaData类
+- [x] 9.1 实现MystiSqlDatabaseMetaData类
   - 实现`java.sql.DatabaseMetaData`接口
   - 持有Connection实例
 
-- [ ] 9.2 实现基本元数据方法
+- [x] 9.2 实现基本元数据方法
   - `getDatabaseProductName()`
   - `getDatabaseProductVersion()`
   - `getDriverName()`
@@ -338,7 +338,7 @@
   - 按实例名称隔离缓存
   - 支持手动刷新缓存
 
-- [ ] 9.10 编写DatabaseMetaData单元测试
+- [x] 9.10 编写DatabaseMetaData单元测试
   - 使用MockWebServer模拟Gateway响应
   - 测试各种元数据查询
   - 测试缓存逻辑
@@ -346,12 +346,12 @@
 
 ## 10. 类型转换工具实现
 
-- [ ] 10.1 实现TypeConverter工具类
+- [x] 10.1 实现TypeConverter工具类
   - MySQL类型字符串到java.sql.Types的映射
   - JSON值到Java类型的转换
   - Java类型到参数类型的转换
 
-- [ ] 10.2 编写类型映射表
+- [x] 10.2 编写类型映射表
   - 创建MySQL → JDBC类型映射Map
   - 处理带长度的类型（VARCHAR(255)）
 
@@ -361,12 +361,12 @@
 
 ## 11. 异常处理实现
 
-- [ ] 11.1 创建MystiSqlException类
+- [x] 11.1 创建MystiSqlException类
   - 继承SQLException
   - 添加errorCode字段
   - 提供友好的错误信息
 
-- [ ] 11.2 实现异常工厂
+- [x] 11.2 实现异常工厂
   - 根据Gateway错误响应创建SQLException
   - 正确设置SQLState和errorCode
 
@@ -376,7 +376,7 @@
 
 ## 12. 日志实现
 
-- [ ] 12.1 配置SLF4J日志
+- [x] 12.1 配置SLF4J日志
   - 在所有关键路径添加日志
   - 使用DEBUG级别记录请求详情
   - 使用ERROR级别记录失败

@@ -6,7 +6,7 @@ Guidelines for AI coding agents working on the MystiSql codebase.
 
 MystiSql is a database access gateway for Kubernetes clusters, supporting MySQL, PostgreSQL, Oracle, and Redis. It provides CLI, WebUI, RESTful API, WebSocket, and JDBC driver interfaces.
 
-**Current Stage**: Early development (Phase 1: Infrastructure layer). See README.md for detailed roadmap and architecture.
+**Current Stage**: Phase 3 development (Security layer - Authentication, Audit, Validation). See README.md for detailed roadmap and architecture.
 
 ## Build/Lint/Test Commands
 
@@ -262,6 +262,164 @@ for _, item := range items {
 - [ ] Documentation updated if needed
 - [ ] No sensitive data in code
 - [ ] Breaking changes documented
+
+## Phase 3: Security Layer
+
+Phase 3 adds enterprise-grade security capabilities to MystiSql. When working on Phase 3 features, consider:
+
+### Security Features
+
+**Authentication**:
+- All API endpoints require authentication (except whitelisted paths like `/health`)
+- Uses JWT tokens with HS256 signature
+- Token management via CLI: `mystisql auth token --user-id <id> --role <role>`
+- Tokens have configurable expiration (default: 24 hours)
+
+**Audit Logging**:
+- All SQL executions are logged with user info, SQL statement, execution time, rows affected
+- Logs stored in JSON Lines format for easy processing
+- Automatic log rotation (daily rotation, 30-day retention)
+- Can be enabled/disabled via configuration
+
+**SQL Validation**:
+- Dangerous operations are blocked by default (DROP, TRUNCATE, DELETE without WHERE)
+- Uses SQL parser (not regex) for accurate detection
+- Whitelist/blacklist support for custom SQL filtering
+- Returns 403 Forbidden when validation fails
+
+**WebSocket Support**:
+- Real-time query execution via WebSocket at `ws://host:port/ws`
+- Authentication via URL parameter: `?token=<jwt>`
+- Connection limits and idle timeout enforcement
+
+**PostgreSQL Support**:
+- PostgreSQL connections use `pgx` driver
+- Connection pool management similar to MySQL
+- SSL mode and timeout configuration supported
+
+### Configuration
+
+Phase 3 introduces new configuration options:
+
+```yaml
+auth:
+  enabled: true
+  token:
+    secret: "your-secret-key"
+    expire: "24h"
+
+audit:
+  enabled: true
+  logFile: "/var/log/mystisql/audit.log"
+  retentionDays: 30
+
+validator:
+  enabled: true
+  dangerousOperations:
+    - DROP
+    - TRUNCATE
+    - DELETE_WITHOUT_WHERE
+  whitelist:
+    - "SELECT * FROM system_config"
+  blacklist:
+    - "DELETE FROM audit_log"
+
+websocket:
+  maxConnections: 1000
+  idleTimeout: "10m"
+  maxConcurrentQueries: 5
+```
+
+### Testing Phase 3 Features
+
+**Unit Tests**:
+```bash
+# Test auth service
+go test -v ./internal/service/auth/...
+
+# Test audit logging
+go test -v ./internal/service/audit/...
+
+# Test SQL validator
+go test -v ./internal/service/validator/...
+
+# Test transaction management
+go test -v ./internal/service/transaction/...
+
+# Test batch operations
+go test -v ./internal/service/batch/...
+```
+
+**Integration Tests**:
+```bash
+# Test CLI auth commands
+go test -v ./internal/cli/... -run TestAuth
+
+# Test API authentication middleware
+go test -v ./internal/api/middleware/...
+```
+
+### CLI Commands for Phase 3
+
+```bash
+# Generate token
+mystisql auth token --user-id admin --role admin --server http://localhost:8080
+
+# Use token for queries
+mystisql query --instance local-mysql "SELECT * FROM users" --token <jwt-token>
+
+# View token info
+mystisql auth info --token <jwt-token>
+
+# Revoke token
+mystisql auth revoke --token <jwt-token>
+```
+
+### Security Best Practices
+
+When implementing Phase 3 features:
+
+1. **Never log sensitive data**: Don't log passwords, tokens, or query results
+2. **Use parameterized queries**: Prevent SQL injection
+3. **Validate all inputs**: Check user inputs before processing
+4. **Sanitize logs**: Remove sensitive information before logging
+5. **Token management**: Tokens should be short-lived and easily revocable
+6. **Audit everything**: All SQL executions must be logged for compliance
+7. **Block dangerous operations**: Default to safe - block DROP, TRUNCATE, etc.
+8. **Connection limits**: Enforce max connections and timeouts
+9. **Error handling**: Don't expose internal errors to users
+
+### Database Connection Pooling (Phase 3)
+
+PostgreSQL connection pooling reuses MySQL's ConnectionPool interface:
+- Same configuration parameters (MaxOpen, MaxIdle, MaxLifetime)
+- Automatic health checking with `SELECT 1`
+- Connection recycling on errors
+
+### JDBC Enhancements (Phase 3)
+
+**Transaction Support**:
+```bash
+# Begin transaction
+POST /api/v1/transaction/begin {"instance": "local-mysql"}
+
+# Execute queries with transaction ID
+POST /api/v1/query {"instance": "local-mysql", "sql": "INSERT ...", "transactionId": "tx-xxx"}
+
+# Commit or rollback
+POST /api/v1/transaction/commit {"transactionId": "tx-xxx"}
+POST /api/v1/transaction/rollback {"transactionId": "tx-xxx"}
+```
+
+**Batch Operations**:
+```bash
+# Execute batch
+POST /api/v1/batch {
+  "instance": "local-mysql",
+  "queries": ["INSERT 1", "INSERT 2", "INSERT 3"],
+  "stopOnError": true
+}
+```
 
 ## Communication Language
 

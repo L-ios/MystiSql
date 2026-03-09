@@ -5,9 +5,9 @@ import (
 )
 
 type ValidationResult struct {
-	Allowed    bool
-	Reason     string
-	RiskLevel  string
+	Allowed   bool
+	Reason    string
+	RiskLevel string
 }
 
 type SQLValidator interface {

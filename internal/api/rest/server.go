@@ -10,9 +10,14 @@ import (
 	"time"
 
 	"MystiSql/internal/api/middleware"
+	"MystiSql/internal/connection"
+	"MystiSql/internal/connection/mysql"
+	"MystiSql/internal/connection/pool"
+	"MystiSql/internal/connection/postgresql"
 	"MystiSql/internal/discovery"
 	"MystiSql/internal/service/auth"
 	"MystiSql/internal/service/query"
+	"MystiSql/internal/service/transaction"
 	"MystiSql/pkg/types"
 
 	"github.com/gin-gonic/gin"
@@ -21,16 +26,19 @@ import (
 
 // Server REST API 服务器
 type Server struct {
-	config       *types.ServerConfig
-	registry     discovery.InstanceRegistry
-	engine       *query.Engine
-	authService  *auth.AuthService
-	logger       *zap.Logger
-	server       *http.Server
-	router       *gin.Engine
-	handlers     *Handlers
-	authHandlers *AuthHandlers
-	version      string
+	config              *types.ServerConfig
+	registry            discovery.InstanceRegistry
+	engine              *query.Engine
+	authService         *auth.AuthService
+	poolManager         *pool.ConnectionPoolManager
+	txManager           *transaction.TransactionManager
+	logger              *zap.Logger
+	server              *http.Server
+	router              *gin.Engine
+	handlers            *Handlers
+	authHandlers        *AuthHandlers
+	transactionHandlers *TransactionHandlers
+	version             string
 }
 
 // NewServer 创建新的 REST API 服务器
@@ -65,6 +73,16 @@ func (s *Server) Setup() error {
 	s.handlers = NewHandlers(s.registry, s.engine, s.logger, s.version)
 	if s.authService != nil {
 		s.authHandlers = NewAuthHandlers(s.authService, s.logger)
+	}
+
+	// 初始化 ConnectionPoolManager 和 TransactionManager
+	if err := s.initTransactionManager(); err != nil {
+		s.logger.Warn("Failed to initialize transaction manager", zap.Error(err))
+	}
+
+	// 设置 handlers 的事务管理器
+	if s.txManager != nil && s.handlers != nil {
+		s.handlers.SetTransactionManager(s.txManager)
 	}
 
 	// 添加中间件（顺序很重要）
@@ -131,6 +149,19 @@ func (s *Server) setupRoutes() {
 		// 查询端点
 		v1.POST("/query", s.handlers.Query)
 		v1.POST("/exec", s.handlers.Exec)
+
+		// 事务管理端点
+		if s.transactionHandlers != nil {
+			transaction := v1.Group("/transaction")
+			{
+				transaction.POST("/begin", s.transactionHandlers.BeginTransaction)
+				transaction.POST("/commit", s.transactionHandlers.CommitTransaction)
+				transaction.POST("/rollback", s.transactionHandlers.RollbackTransaction)
+				transaction.GET("/:id", s.transactionHandlers.GetTransaction)
+				transaction.GET("", s.transactionHandlers.ListTransactions)
+				transaction.POST("/:id/extend", s.transactionHandlers.ExtendTransaction)
+			}
+		}
 	}
 }
 
@@ -199,4 +230,66 @@ func (s *Server) Run() error {
 // GetRouter 获取路由器（用于测试）
 func (s *Server) GetRouter() *gin.Engine {
 	return s.router
+}
+
+// initTransactionManager 初始化事务管理器
+func (s *Server) initTransactionManager() error {
+	// 创建多数据库类型工厂
+	factory := newMultiDatabaseFactory()
+
+	// 创建连接池管理器
+	s.poolManager = pool.NewConnectionPoolManager(factory, nil)
+
+	// 从注册中心加载所有实例并添加到连接池管理器
+	instances, err := s.registry.ListInstances()
+	if err != nil {
+		s.logger.Error("Failed to list instances", zap.Error(err))
+		return err
+	}
+
+	for _, instance := range instances {
+		if err := s.poolManager.AddInstance(instance); err != nil {
+			s.logger.Warn("Failed to add instance to pool manager",
+				zap.String("instance", instance.Name),
+				zap.Error(err),
+			)
+		} else {
+			s.logger.Debug("Added instance to pool manager",
+				zap.String("instance", instance.Name),
+			)
+		}
+	}
+
+	// 创建事务管理器
+	s.txManager = transaction.NewTransactionManager(s.poolManager, s.logger, nil)
+
+	// 创建事务处理器
+	s.transactionHandlers = NewTransactionHandlers(s.txManager, s.logger)
+
+	s.logger.Info("Transaction manager initialized")
+	return nil
+}
+
+// multiDatabaseFactory 多数据库类型工厂
+type multiDatabaseFactory struct {
+	mysqlFactory      connection.ConnectionFactory
+	postgresqlFactory connection.ConnectionFactory
+}
+
+func newMultiDatabaseFactory() *multiDatabaseFactory {
+	return &multiDatabaseFactory{
+		mysqlFactory:      mysql.NewFactory(),
+		postgresqlFactory: postgresql.NewFactory(),
+	}
+}
+
+func (f *multiDatabaseFactory) CreateConnection(instance *types.DatabaseInstance) (connection.Connection, error) {
+	switch instance.Type {
+	case types.DatabaseTypeMySQL:
+		return f.mysqlFactory.CreateConnection(instance)
+	case types.DatabaseTypePostgreSQL:
+		return f.postgresqlFactory.CreateConnection(instance)
+	default:
+		return nil, fmt.Errorf("unsupported database type: %s", instance.Type)
+	}
 }

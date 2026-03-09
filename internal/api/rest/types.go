@@ -50,9 +50,10 @@ type InstancesListResponse struct {
 
 // QueryRequest 查询请求
 type QueryRequest struct {
-	Instance string `json:"instance" binding:"required"` // 实例名称（必填）
-	SQL      string `json:"sql" binding:"required"`      // SQL 语句（必填）
-	Timeout  int    `json:"timeout,omitempty"`           // 超时时间（秒），可选
+	Instance      string `json:"instance" binding:"required"` // 实例名称（必填）
+	SQL           string `json:"sql" binding:"required"`      // SQL 语句（必填）
+	Timeout       int    `json:"timeout,omitempty"`           // 超时时间（秒），可选
+	TransactionID string `json:"transaction_id,omitempty"`    // 事务 ID（可选，用于事务查询）
 }
 
 // QueryResponse 查询响应
@@ -80,9 +81,10 @@ type ExecResponse struct {
 
 // ExecRequest 执行请求
 type ExecRequest struct {
-	Instance string `json:"instance" binding:"required"` // 实例名称（必填）
-	SQL      string `json:"sql" binding:"required"`      // SQL 语句（必填）
-	Timeout  int    `json:"timeout,omitempty"`           // 超时时间（秒），可选
+	Instance      string `json:"instance" binding:"required"` // 实例名称（必填）
+	SQL           string `json:"sql" binding:"required"`      // SQL 语句（必填）
+	Timeout       int    `json:"timeout,omitempty"`           // 超时时间（秒），可选
+	TransactionID string `json:"transaction_id,omitempty"`    // 事务 ID（可选，用于事务执行）
 }
 
 // ExecResultData 执行结果数据
@@ -150,9 +152,9 @@ type GenerateTokenRequest struct {
 
 // GenerateTokenResponse 生成 Token 响应
 type GenerateTokenResponse struct {
-	Success bool                   `json:"success"`         // 是否成功
-	Data    *TokenData             `json:"data,omitempty"`  // Token 数据
-	Error   *ErrorDetail           `json:"error,omitempty"` // 错误详情
+	Success bool         `json:"success"`         // 是否成功
+	Data    *TokenData   `json:"data,omitempty"`  // Token 数据
+	Error   *ErrorDetail `json:"error,omitempty"` // 错误详情
 }
 
 // TokenData Token 数据
@@ -180,24 +182,24 @@ type RevokeTokenResponse struct {
 // TokenInfoResponse Token 信息响应
 type TokenInfoResponse struct {
 	Success   bool         `json:"success"`         // 是否成功
-	UserID    string       `json:"userId"`    // 用户 ID
-	Role      string       `json:"role"`      // 角色
-	TokenID   string       `json:"tokenId"`   // Token ID
-	ExpiresAt time.Time    `json:"expiresAt"` // 过期时间
-	IssuedAt  time.Time    `json:"issuedAt"`  // 签发时间
+	UserID    string       `json:"userId"`          // 用户 ID
+	Role      string       `json:"role"`            // 角色
+	TokenID   string       `json:"tokenId"`         // Token ID
+	ExpiresAt time.Time    `json:"expiresAt"`       // 过期时间
+	IssuedAt  time.Time    `json:"issuedAt"`        // 签发时间
 	Error     *ErrorDetail `json:"error,omitempty"` // 错误详情
 }
 
 // TokensListResponse Token 列表响应
 type TokensListResponse struct {
-	Success         bool                     `json:"success"`         // 是否成功
-	RevokedTokens   []RevokedTokenInfo       `json:"revokedTokens"`   // 已撤销的 Token 列表
-	Error           *ErrorDetail             `json:"error,omitempty"` // 错误详情
+	Success       bool               `json:"success"`         // 是否成功
+	RevokedTokens []RevokedTokenInfo `json:"revokedTokens"`   // 已撤销的 Token 列表
+	Error         *ErrorDetail       `json:"error,omitempty"` // 错误详情
 }
 
 // RevokedTokenInfo 已撤销的 Token 信息
 type RevokedTokenInfo struct {
-	Token       string    `json:"token"`       // Token（脱敏）
-	Reason      string    `json:"reason"`      // 撤销原因
-	RevokedAt   time.Time `json:"revokedAt"`   // 撤销时间
+	Token     string    `json:"token"`     // Token（脱敏）
+	Reason    string    `json:"reason"`    // 撤销原因
+	RevokedAt time.Time `json:"revokedAt"` // 撤销时间
 }

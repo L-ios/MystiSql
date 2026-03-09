@@ -8,6 +8,7 @@ import (
 
 	"MystiSql/internal/discovery"
 	"MystiSql/internal/service/query"
+	"MystiSql/internal/service/transaction"
 	"MystiSql/pkg/types"
 
 	"github.com/gin-gonic/gin"
@@ -16,10 +17,11 @@ import (
 
 // Handlers API 处理器
 type Handlers struct {
-	registry discovery.InstanceRegistry
-	engine   *query.Engine
-	logger   *zap.Logger
-	version  string
+	registry  discovery.InstanceRegistry
+	engine    *query.Engine
+	txManager *transaction.TransactionManager
+	logger    *zap.Logger
+	version   string
 }
 
 // NewHandlers 创建新的处理器
@@ -30,6 +32,11 @@ func NewHandlers(registry discovery.InstanceRegistry, engine *query.Engine, logg
 		logger:   logger,
 		version:  version,
 	}
+}
+
+// SetTransactionManager 设置事务管理器
+func (h *Handlers) SetTransactionManager(txManager *transaction.TransactionManager) {
+	h.txManager = txManager
 }
 
 // Health 健康检查端点
@@ -174,13 +181,36 @@ func (h *Handlers) Query(c *gin.Context) {
 
 	// 执行查询
 	start := time.Now()
-	result, err := h.engine.ExecuteQuery(ctx, req.Instance, req.SQL)
+	var result *types.QueryResult
+	var err error
+
+	// 如果提供了事务 ID，使用事务连接执行查询
+	if req.TransactionID != "" && h.txManager != nil {
+		tx, txErr := h.txManager.GetTransaction(req.TransactionID)
+		if txErr != nil {
+			h.logger.Error("Failed to get transaction",
+				zap.String("transaction_id", req.TransactionID),
+				zap.Error(txErr),
+			)
+			c.JSON(http.StatusBadRequest, NewErrorResponse(
+				"TRANSACTION_ERROR",
+				fmt.Sprintf("Failed to get transaction: %v", txErr),
+			))
+			return
+		}
+
+		result, err = tx.Connection.Query(ctx, req.SQL)
+	} else {
+		result, err = h.engine.ExecuteQuery(ctx, req.Instance, req.SQL)
+	}
+
 	execTime := time.Since(start)
 
 	if err != nil {
 		h.logger.Error("Query failed",
 			zap.String("instance", req.Instance),
 			zap.String("sql", req.SQL),
+			zap.String("transaction_id", req.TransactionID),
 			zap.Error(err),
 		)
 		c.JSON(http.StatusInternalServerError, &QueryResponse{
@@ -230,13 +260,36 @@ func (h *Handlers) Exec(c *gin.Context) {
 
 	// 执行更新
 	start := time.Now()
-	result, err := h.engine.ExecuteExec(ctx, req.Instance, req.SQL)
+	var result *types.ExecResult
+	var err error
+
+	// 如果提供了事务 ID，使用事务连接执行
+	if req.TransactionID != "" && h.txManager != nil {
+		tx, txErr := h.txManager.GetTransaction(req.TransactionID)
+		if txErr != nil {
+			h.logger.Error("Failed to get transaction",
+				zap.String("transaction_id", req.TransactionID),
+				zap.Error(txErr),
+			)
+			c.JSON(http.StatusBadRequest, NewErrorResponse(
+				"TRANSACTION_ERROR",
+				fmt.Sprintf("Failed to get transaction: %v", txErr),
+			))
+			return
+		}
+
+		result, err = tx.Connection.Exec(ctx, req.SQL)
+	} else {
+		result, err = h.engine.ExecuteExec(ctx, req.Instance, req.SQL)
+	}
+
 	execTime := time.Since(start)
 
 	if err != nil {
 		h.logger.Error("Exec failed",
 			zap.String("instance", req.Instance),
 			zap.String("sql", req.SQL),
+			zap.String("transaction_id", req.TransactionID),
 			zap.Error(err),
 		)
 		c.JSON(http.StatusInternalServerError, &ExecResponse{

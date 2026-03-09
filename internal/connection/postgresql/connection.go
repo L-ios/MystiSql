@@ -10,7 +10,6 @@ import (
 	"MystiSql/pkg/errors"
 	"MystiSql/pkg/types"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 )
@@ -92,8 +91,8 @@ func (c *Connection) Query(ctx context.Context, query string) (*types.QueryResul
 	columns := make([]types.ColumnInfo, len(fieldDescriptions))
 	for i, fd := range fieldDescriptions {
 		columns[i] = types.ColumnInfo{
-			Name: fd.Name,
-			Type: string(fd.DataType.Name),
+			Name: string(fd.Name),
+			Type: "unknown",
 		}
 	}
 
@@ -104,9 +103,9 @@ func (c *Connection) Query(ctx context.Context, query string) (*types.QueryResul
 			return nil, fmt.Errorf("failed to scan row values: %w", err)
 		}
 
-		row := make(types.Row)
-		for _, value := range values {
-			row = append(row, value)
+		row := make(types.Row, len(values))
+		for i, value := range values {
+			row[i] = value
 		}
 		allRows = append(allRows, row)
 	}
@@ -166,12 +165,17 @@ func (c *Connection) buildDSN(instance *types.DatabaseInstance) (string, error) 
 		instance.Database,
 	))
 
-	if sslMode, ok := instance.Params["sslmode"]; ok {
-		parts = append(parts, fmt.Sprintf("?sslmode=%s", sslMode))
+	queryParams := make([]string, 0)
+	if sslMode, ok := instance.Labels["sslmode"]; ok {
+		queryParams = append(queryParams, fmt.Sprintf("sslmode=%s", sslMode))
 	}
 
-	if connectTimeout, ok := instance.Params["connect_timeout"]; ok {
-		parts = append(parts, fmt.Sprintf("&connect_timeout=%s", connectTimeout))
+	if connectTimeout, ok := instance.Labels["connect_timeout"]; ok {
+		queryParams = append(queryParams, fmt.Sprintf("connect_timeout=%s", connectTimeout))
+	}
+
+	if len(queryParams) > 0 {
+		parts = append(parts, "?"+strings.Join(queryParams, "&"))
 	}
 
 	return strings.Join(parts, ""), nil

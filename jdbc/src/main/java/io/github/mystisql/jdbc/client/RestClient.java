@@ -300,7 +300,15 @@ public class RestClient {
         }
         
         String sqlState = mapErrorCodeToSQLState(error.getCode());
-        return new SQLException(error.getMessage(), sqlState, error.getCode());
+        int vendorCode = 0;
+        try {
+            if (error.getCode() != null) {
+                vendorCode = Integer.parseInt(error.getCode().replaceAll("[^0-9]", ""));
+            }
+        } catch (NumberFormatException e) {
+            // Ignore
+        }
+        return new SQLException(error.getMessage(), sqlState, vendorCode);
     }
     
     /**

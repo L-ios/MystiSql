@@ -11,16 +11,21 @@ repositories {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_1_8
-    targetCompatibility = JavaVersion.VERSION_1_8
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
     withJavadocJar()
     withSourcesJar()
 }
 
+sourceSets {
+    main {
+        java {
+            exclude("**/examples/**")
+        }
+    }
+}
+
 dependencies {
-    // JDBC API (provided by JDK, but needed for compilation)
-    compileOnly("java.sql:java.sql-api:1.0")
-    
     // HTTP Client
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     

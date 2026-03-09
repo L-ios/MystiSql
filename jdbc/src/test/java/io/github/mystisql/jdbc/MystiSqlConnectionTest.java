@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.sql.*;
+import java.util.Properties;
 
 /**
  * Unit tests for MystiSqlConnection

@@ -370,11 +370,10 @@ public class MystiSqlResultSet implements ResultSet {
     @Override public String getCursorName() throws SQLException { return null; }
     @Override public Reader getCharacterStream(int columnIndex) throws SQLException { return null; }
     @Override public Reader getCharacterStream(String columnLabel) throws SQLException { return null; }
-    @Override public boolean isReadOnly() throws SQLException { return true; }
-    @Override public boolean nullsAreSortedHigh() throws SQLException { return false; }
-    @Override public boolean nullsAreSortedLow() throws SQLException { return true; }
-    @Override public boolean nullsAreSortedAtStart() throws SQLException { return false; }
-    @Override public boolean nullsAreSortedAtEnd() throws SQLException { return true; }
+    @Override public boolean first() throws SQLException { throw new SQLException("Type TYPE_FORWARD_ONLY"); }
+    @Override public boolean last() throws SQLException { throw new SQLException("Type TYPE_FORWARD_ONLY"); }
+    @Override public void beforeFirst() throws SQLException { throw new SQLException("Type TYPE_FORWARD_ONLY"); }
+    @Override public void afterLast() throws SQLException { throw new SQLException("Type TYPE_FORWARD_ONLY"); }
     @Override public <T> T unwrap(Class<T> iface) throws SQLException { throw new SQLFeatureNotSupportedException(); }
     @Override public boolean isWrapperFor(Class<?> iface) throws SQLException { return false; }
     @Override public Object getObject(int columnIndex, Map<String, Class<?>> map) throws SQLException { return getObject(columnIndex); }
@@ -404,7 +403,6 @@ public class MystiSqlResultSet implements ResultSet {
     @Override public void updateRowId(int columnIndex, RowId x) throws SQLException { throw new SQLFeatureNotSupportedException(); }
     @Override public void updateRowId(String columnLabel, RowId x) throws SQLException { throw new SQLFeatureNotSupportedException(); }
     @Override public int getHoldability() throws SQLException { return HOLD_CURSORS_OVER_COMMIT; }
-    @Override public boolean isClosed() throws SQLException { return closed; }
     @Override public void updateNString(int columnIndex, String nString) throws SQLException { throw new SQLFeatureNotSupportedException(); }
     @Override public void updateNString(String columnLabel, String nString) throws SQLException { throw new SQLFeatureNotSupportedException(); }
     @Override public void updateNClob(int columnIndex, NClob nClob) throws SQLException { throw new SQLFeatureNotSupportedException(); }
@@ -447,8 +445,6 @@ public class MystiSqlResultSet implements ResultSet {
     @Override public void updateClob(String columnLabel, Reader reader) throws SQLException { throw new SQLFeatureNotSupportedException(); }
     @Override public void updateNClob(int columnIndex, Reader reader) throws SQLException { throw new SQLFeatureNotSupportedException(); }
     @Override public void updateNClob(String columnLabel, Reader reader) throws SQLException { throw new SQLFeatureNotSupportedException(); }
-    @Override public <T> T getObject(int columnIndex, Class<T> type) throws SQLException { throw new SQLFeatureNotSupportedException(); }
-    @Override public <T> T getObject(String columnLabel, Class<T> type) throws SQLException { throw new SQLFeatureNotSupportedException(); }
 }
 
 /**

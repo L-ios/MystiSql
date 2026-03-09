@@ -171,7 +171,7 @@ class MystiSqlResultSetTest {
 
     @Test
     @DisplayName("GetXXX with invalid column index should throw")
-    void testInvalidColumnIndex() {
+    void testInvalidColumnIndex() throws SQLException {
         resultSet.next();
         assertThrows(SQLException.class, () -> resultSet.getString(0)); // 0 is invalid
         assertThrows(SQLException.class, () -> resultSet.getString(10)); // too large

@@ -80,7 +80,7 @@ public class MystiSqlPreparedStatement extends MystiSqlStatement implements Prep
         }
     }
     
-    private QueryRequest buildQueryRequest() {
+    private QueryRequest buildQueryRequest() throws SQLException {
         QueryRequest request = new QueryRequest();
         request.setInstance(getConnection().getInstanceName());
         request.setQuery(sql);
@@ -207,7 +207,7 @@ public class MystiSqlPreparedStatement extends MystiSqlStatement implements Prep
     }
     
     @Override
-    public MystiSqlConnection getConnection() {
+    public MystiSqlConnection getConnection() throws SQLException {
         return (MystiSqlConnection) super.getConnection();
     }
     

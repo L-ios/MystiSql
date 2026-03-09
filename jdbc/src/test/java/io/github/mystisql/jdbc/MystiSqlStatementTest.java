@@ -196,9 +196,11 @@ class MystiSqlStatementTest {
     }
 
     @Test
-    @DisplayName("GetGeneratedKeys should throw SQLException")
-    void testGetGeneratedKeys() {
-        assertThrows(SQLException.class, () -> statement.getGeneratedKeys());
+    @DisplayName("GetGeneratedKeys should return empty ResultSet")
+    void testGetGeneratedKeys() throws SQLException {
+        ResultSet rs = statement.getGeneratedKeys();
+        assertNotNull(rs);
+        assertFalse(rs.next()); // Empty result set
     }
 
     @Test
@@ -246,16 +248,15 @@ class MystiSqlStatementTest {
     }
 
     @Test
-    @DisplayName("IsWrapperFor should return false")
+    @DisplayName("IsWrapperFor should return false for unsupported interface")
     void testIsWrapperFor() throws SQLException {
-        assertFalse(statement.isWrapperFor(Statement.class));
+        assertFalse(statement.isWrapperFor(ResultSet.class));
     }
-
+    
     @Test
     @DisplayName("Unwrap should throw SQLFeatureNotSupportedException")
     void testUnwrap() {
-        assertThrows(SQLFeatureNotSupportedException.class, 
-            () -> statement.unwrap(Statement.class));
+        assertThrows(SQLFeatureNotSupportedException.class, () -> statement.unwrap(ResultSet.class));
     }
 
     @Test

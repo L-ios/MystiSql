@@ -20,12 +20,19 @@
 
 ### Requirement: 建立连接
 
-系统必须能够使用提供的凭据建立到 MySQL 实例的连接。
+系统必须能够使用提供的凭据建立到数据库实例的连接。
 
-#### Scenario: 成功建立连接
+#### Scenario: 成功建立 MySQL 连接
 
-- **WHEN** 使用有效的 host、port、username、password 和 database 调用 Connect() 方法
+- **WHEN** 使用有效的 host、port、username、password 和 database 调用 Connect() 方法（type=mysql）
 - **THEN** 系统必须成功建立到 MySQL 实例的连接
+- **AND** 连接必须准备好执行查询
+- **AND** 必须返回 nil 错误
+
+#### Scenario: 成功建立 PostgreSQL 连接
+
+- **WHEN** 使用有效的 host、port、username、password 和 database 调用 Connect() 方法（type=postgresql）
+- **THEN** 系统必须成功建立到 PostgreSQL 实例的连接
 - **AND** 连接必须准备好执行查询
 - **AND** 必须返回 nil 错误
 
@@ -33,31 +40,30 @@
 
 - **WHEN** 使用无效的用户名或密码调用 Connect() 方法
 - **THEN** 系统必须返回 ErrConnectionFailed 错误
-- **AND** 错误必须包含底层的 MySQL 错误信息
-- **AND** 不得建立连接
+- **AND** 错误消息必须包含实例类型和名称
 
-#### Scenario: 连接失败 - 无法访问的主机
+#### Scenario: 连接失败 - 不支持的数据库类型
 
-- **WHEN** 使用无法访问的 host 或 port 调用 Connect() 方法
-- **THEN** 系统必须返回 ErrConnectionFailed 错误
-- **AND** 系统不得无限期挂起（必须超时）
-- **AND** 必须在合理的时间内返回（默认 30 秒）
-
-#### Scenario: 连接失败 - 数据库不存在
-
-- **WHEN** 指定的数据库不存在
-- **THEN** 系统必须返回 ErrConnectionFailed 错误
-- **AND** 错误消息必须明确说明 "数据库不存在"
+- **WHEN** 使用不支持的数据库类型（type != mysql && type != postgresql）调用 Connect() 方法
+- **THEN** 系统必须返回 ErrUnsupportedDatabaseType 错误
+- **AND** 错误消息必须包含支持的数据库类型列表
 
 ---
 
 ### Requirement: 执行查询
 
-系统必须能够在已建立的 MySQL 连接上执行 SQL 查询。
+系统必须能够在连接上执行 SQL 查询并返回结果。
 
-#### Scenario: 执行 SELECT 查询
+#### Scenario: 执行 MySQL SELECT 查询
 
-- **WHEN** 使用有效的 SELECT 语句调用 Query(ctx, sql) 方法
+- **WHEN** 使用有效的 SELECT 语句调用 Query(ctx, sql) 方法（MySQL 实例）
+- **THEN** 系统必须执行查询
+- **AND** 必须返回包含列和行的 QueryResult 对象
+- **AND** 必须正确处理结果集流式传输
+
+#### Scenario: 执行 PostgreSQL SELECT 查询
+
+- **WHEN** 使用有效的 SELECT 语句调用 Query(ctx, sql) 方法（PostgreSQL 实例）
 - **THEN** 系统必须执行查询
 - **AND** 必须返回包含列和行的 QueryResult 对象
 - **AND** 必须正确处理结果集流式传输
@@ -86,7 +92,7 @@
 
 - **WHEN** 使用无效的 SQL 语法调用 Query() 方法
 - **THEN** 系统必须返回 ErrQueryFailed 错误
-- **AND** 错误必须包含 MySQL 返回的语法错误信息
+- **AND** 错误必须包含数据库返回的语法错误信息
 
 ---
 
@@ -175,7 +181,7 @@
 
 #### Scenario: 包装底层错误
 
-- **WHEN** MySQL 返回错误
+- **WHEN** 数据库返回错误
 - **THEN** 系统必须用上下文包装错误
 - **AND** 错误消息必须包含实例名称和操作类型
 - **AND** 必须可以使用 errors.Is() 检查错误类型
@@ -186,3 +192,59 @@
 - **THEN** 系统必须记录错误详情（不包含密码）
 - **AND** 必须包含实例名称、主机和端口
 - **AND** 必须使用结构化日志格式
+
+---
+
+### Requirement: 多数据库类型路由
+
+系统必须根据实例类型自动选择对应的数据库驱动。
+
+#### Scenario: 识别 MySQL 实例
+
+- **WHEN** 实例配置中 type 为 "mysql"
+- **THEN** 系统必须使用 go-sql-driver/mysql 驱动建立连接
+
+#### Scenario: 识别 PostgreSQL 实例
+
+- **WHEN** 实例配置中 type 为 "postgresql"
+- **THEN** 系统必须使用 pgx 驱动建立连接
+
+#### Scenario: 动态驱动选择
+
+- **WHEN** 初始化连接池时
+- **THEN** 系统必须根据实例配置的 type 字段动态选择驱动
+- **AND** 必须在连接池创建时记录使用的驱动类型
+
+---
+
+### Requirement: PostgreSQL 特有配置支持
+
+系统必须支持 PostgreSQL 特有的连接配置。
+
+#### Scenario: 配置 SSL 模式
+
+- **WHEN** PostgreSQL 实例配置包含 sslmode 参数
+- **THEN** 连接必须使用指定的 SSL 模式（disable、require、verify-ca、verify-full）
+
+#### Scenario: 配置连接超时
+
+- **WHEN** PostgreSQL 实例配置包含 connectTimeout 参数
+- **THEN** 连接超时时间必须设置为指定值
+
+---
+
+### Requirement: PostgreSQL 错误处理
+
+系统必须正确处理 PostgreSQL 特有的错误。
+
+#### Scenario: 处理唯一约束冲突
+
+- **WHEN** INSERT 违反唯一约束（PostgreSQL 实例）
+- **THEN** 系统必须返回明确的错误信息
+- **AND** 错误消息必须包含冲突的字段名
+
+#### Scenario: 处理外键约束错误
+
+- **WHEN** 操作违反外键约束（PostgreSQL 实例）
+- **THEN** 系统必须返回明确的错误信息
+- **AND** 错误消息必须包含相关表和外键名

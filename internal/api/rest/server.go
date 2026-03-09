@@ -16,6 +16,7 @@ import (
 	"MystiSql/internal/connection/postgresql"
 	"MystiSql/internal/discovery"
 	"MystiSql/internal/service/auth"
+	"MystiSql/internal/service/batch"
 	"MystiSql/internal/service/query"
 	"MystiSql/internal/service/transaction"
 	"MystiSql/pkg/types"
@@ -32,12 +33,14 @@ type Server struct {
 	authService         *auth.AuthService
 	poolManager         *pool.ConnectionPoolManager
 	txManager           *transaction.TransactionManager
+	batchService        *batch.BatchService
 	logger              *zap.Logger
 	server              *http.Server
 	router              *gin.Engine
 	handlers            *Handlers
 	authHandlers        *AuthHandlers
 	transactionHandlers *TransactionHandlers
+	batchHandlers       *BatchHandlers
 	version             string
 }
 
@@ -162,6 +165,11 @@ func (s *Server) setupRoutes() {
 				transaction.POST("/:id/extend", s.transactionHandlers.ExtendTransaction)
 			}
 		}
+
+		// 批量操作端点
+		if s.batchHandlers != nil {
+			v1.POST("/batch", s.batchHandlers.ExecuteBatch)
+		}
 	}
 }
 
@@ -263,8 +271,14 @@ func (s *Server) initTransactionManager() error {
 	// 创建事务管理器
 	s.txManager = transaction.NewTransactionManager(s.poolManager, s.logger, nil)
 
+	// 创建批量操作服务
+	s.batchService = batch.NewBatchService(s.txManager, nil, s.logger)
+
 	// 创建事务处理器
 	s.transactionHandlers = NewTransactionHandlers(s.txManager, s.logger)
+
+	// 创建批量操作处理器
+	s.batchHandlers = NewBatchHandlers(s.batchService, s.logger)
 
 	s.logger.Info("Transaction manager initialized")
 	return nil

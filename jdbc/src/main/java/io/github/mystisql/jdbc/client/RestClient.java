@@ -46,7 +46,9 @@ public class RestClient {
             .connectionPool(new ConnectionPool(20, 5, TimeUnit.MINUTES))
             .build();
         
-        logger.debug("RestClient initialized: baseUrl={}, timeout={}s", baseUrl, timeoutSeconds);
+        // Log without sensitive token information
+        logger.debug("RestClient initialized: baseUrl={}, timeout={}s, token={}", 
+            baseUrl, timeoutSeconds, token != null ? "***" : "none");
     }
     
     /**

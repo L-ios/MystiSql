@@ -92,6 +92,7 @@ func init() {
 	// 全局标志
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "配置文件路径")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "详细日志输出")
+	rootCmd.PersistentFlags().StringVar(&tokenFlag, "token", "", "认证 Token")
 }
 
 // GetConfig 获取配置

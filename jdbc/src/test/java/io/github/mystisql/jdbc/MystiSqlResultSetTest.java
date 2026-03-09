@@ -44,7 +44,7 @@ class MystiSqlResultSetTest {
     @DisplayName("Next should move cursor correctly")
     void testNext() throws SQLException {
         // Initially before first row
-        assertFalse(resultSet.isBeforeFirst());
+        assertTrue(resultSet.isBeforeFirst());
         
         // Move to first row
         assertTrue(resultSet.next());

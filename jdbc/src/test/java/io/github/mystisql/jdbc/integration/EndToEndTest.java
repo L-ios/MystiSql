@@ -168,7 +168,7 @@ class EndToEndTest {
         DriverManager.registerDriver(driver);
 
         try {
-            Connection conn = DriverManager.getConnection(jdbcUrl);
+            Connection conn = DriverManager.getConnection(jdbcUrl, "test-instance", "test-token");
             DatabaseMetaData metaData = conn.getMetaData();
 
             assertNotNull(metaData);

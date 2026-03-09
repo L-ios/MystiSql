@@ -61,6 +61,12 @@
   - version: 服务版本
   - instances: 实例状态数组（如果 check-instances=true）
 
+#### Scenario: 健康检查无需认证
+
+- **WHEN** 调用 GET /health
+- **THEN** 必须不要求认证 Token
+- **AND** 直接返回健康状态
+
 ---
 
 ### Requirement: Query 端点
@@ -111,6 +117,12 @@
   - rowCount: 行数
   - executionTimeMs: 执行时间（毫秒）
 
+#### Scenario: 查询 - 未认证
+
+- **WHEN** 调用 POST /api/v1/query 但未提供有效的认证 Token
+- **THEN** 必须返回 401 Unauthorized 状态
+- **AND** 响应必须包含错误消息："未提供有效的认证 Token"
+
 ---
 
 ### Requirement: 实例列表端点
@@ -135,6 +147,12 @@
 - **WHEN** 返回实例信息
 - **THEN** 密码字段必须被脱敏（显示为 "******"）
 - **AND** 必须不包含敏感配置信息
+
+#### Scenario: 列出实例 - 未认证
+
+- **WHEN** 调用 GET /api/v1/instances 但未提供有效的认证 Token
+- **THEN** 必须返回 401 Unauthorized 状态
+- **AND** 响应必须包含错误消息："未提供有效的认证 Token"
 
 ---
 

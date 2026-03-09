@@ -132,11 +132,13 @@ public class MystiSqlPreparedStatement extends MystiSqlStatement implements Prep
     
     @Override
     public void setInt(int parameterIndex, int x) throws SQLException {
+        checkClosed();
         setParameter(parameterIndex, new Parameter("INTEGER", x));
     }
     
     @Override
     public void setLong(int parameterIndex, long x) throws SQLException {
+        checkClosed();
         setParameter(parameterIndex, new Parameter("BIGINT", x));
     }
     

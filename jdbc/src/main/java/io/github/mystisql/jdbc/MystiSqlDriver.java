@@ -35,7 +35,7 @@ public class MystiSqlDriver implements Driver {
     @Override
     public Connection connect(String url, Properties info) throws SQLException {
         if (!acceptsURL(url)) {
-            throw new SQLException("Invalid URL format: " + url);
+            throw new SQLException("Invalid URL format: " + sanitizeUrl(url));
         }
         
         // Parse URL
@@ -72,6 +72,18 @@ public class MystiSqlDriver implements Driver {
         
         // Create connection
         return new MystiSqlConnection(host, port, instanceName, username, token, timeout, ssl, verifySsl, maxConnections);
+    }
+    
+    /**
+     * Sanitize URL for logging by hiding sensitive information.
+     * 
+     * @param url JDBC URL
+     * @return sanitized URL safe for logging
+     */
+    private String sanitizeUrl(String url) {
+        if (url == null) return "null";
+        // Remove token parameter from URL
+        return url.replaceAll("token=[^&]*", "token=***");
     }
     
     @Override

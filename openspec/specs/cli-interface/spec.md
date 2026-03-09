@@ -59,6 +59,11 @@
 - **THEN** 当前目录的配置文件优先级最高
 - **AND** 系统范围的配置文件优先级最低
 
+#### Scenario: Token 传递方式优先级
+
+- **WHEN** 同时存在多种 Token 配置方式
+- **THEN** 优先级为：命令行参数 --token > 环境变量 MYSTISQL_TOKEN > 配置文件 token 字段
+
 ---
 
 ### Requirement: Query 命令
@@ -67,7 +72,7 @@
 
 #### Scenario: 执行查询命令
 
-- **WHEN** 用户运行 `mystisql query <instance-name> "<sql>"`
+- **WHEN** 用户运行 `mystisql query --instance <instance-name> "<sql>"`
 - **THEN** 系统必须连接到指定实例
 - **AND** 必须执行 SQL 查询
 - **AND** 必须在格式化表格中显示结果
@@ -101,6 +106,24 @@
 - **AND** CSV 必须包含标题行
 - **AND** 特殊字符必须正确转义
 
+#### Scenario: 查询命令 - 使用 Token 认证
+
+- **WHEN** 用户运行 `mystisql query --instance <name> "<sql>" --token <jwt_token>`
+- **THEN** 系统必须使用 Token 进行认证
+- **AND** 认证成功后执行查询
+
+#### Scenario: 查询命令 - 认证失败
+
+- **WHEN** 用户运行查询命令但 Token 无效或已过期
+- **THEN** 系统必须显示错误："认证失败：Token 无效或已过期"
+- **AND** 必须以状态码 1 退出
+
+#### Scenario: 查询命令 - 未提供 Token
+
+- **WHEN** 用户运行查询命令但未提供 Token（且未在配置文件或环境变量中设置）
+- **THEN** 系统必须显示错误："未提供认证 Token，请使用 --token 参数或配置环境变量 MYSTISQL_TOKEN"
+- **AND** 必须以状态码 1 退出
+
 ---
 
 ### Requirement: Instances 命令
@@ -133,6 +156,12 @@
 - **THEN** 系统必须显示指定实例的详细信息
 - **AND** 必须包括所有配置字段（敏感信息脱敏）
 - **AND** 如果实例不存在，必须返回错误
+
+#### Scenario: 列出实例 - 使用 Token 认证
+
+- **WHEN** 用户运行 `mystisql instances list --token <jwt_token>`
+- **THEN** 系统必须使用 Token 进行认证
+- **AND** 认证成功后返回实例列表
 
 ---
 
@@ -228,3 +257,26 @@
 - **THEN** 必须包含实际使用示例
 - **AND** 示例必须是可执行的
 - **AND** 示例必须覆盖常见用例
+
+---
+
+### Requirement: Auth 子命令
+
+系统必须提供 auth 子命令管理 Token。
+
+#### Scenario: 生成 Token
+
+- **WHEN** 用户运行 `mystisql auth token --user-id <user_id> --role <role>`
+- **THEN** 系统必须生成并返回 JWT Token
+- **AND** 必须显示 Token 的过期时间
+
+#### Scenario: 撤销 Token
+
+- **WHEN** 管理员运行 `mystisql auth revoke --token <jwt_token>`
+- **THEN** 系统必须撤销该 Token
+- **AND** 必须显示成功消息
+
+#### Scenario: 查看当前 Token 信息
+
+- **WHEN** 用户运行 `mystisql auth info --token <jwt_token>`
+- **THEN** 系统必须显示 Token 的详细信息（user_id、role、过期时间）

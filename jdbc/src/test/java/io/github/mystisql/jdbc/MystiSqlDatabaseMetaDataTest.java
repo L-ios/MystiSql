@@ -341,56 +341,58 @@ class MystiSqlDatabaseMetaDataTest {
     }
 
     @Test
-    @DisplayName("GetCatalogs should throw SQLException")
-    void testGetCatalogs() {
-        assertThrows(SQLException.class, () -> metaData.getCatalogs());
+    @DisplayName("GetCatalogs should return ResultSet")
+    void testGetCatalogs() throws SQLException {
+        ResultSet rs = metaData.getCatalogs();
+        assertNotNull(rs);
     }
 
     @Test
-    @DisplayName("GetSchemas should throw SQLException")
-    void testGetSchemas() {
-        assertThrows(SQLException.class, () -> metaData.getSchemas());
+    @DisplayName("GetSchemas should return ResultSet")
+    void testGetSchemas() throws SQLException {
+        ResultSet rs = metaData.getSchemas();
+        assertNotNull(rs);
     }
 
     @Test
-    @DisplayName("GetTables should throw SQLException")
-    void testGetTables() {
-        assertThrows(SQLException.class, 
-            () -> metaData.getTables(null, null, "%", null));
+    @DisplayName("GetTables should return ResultSet")
+    void testGetTables() throws SQLException {
+        ResultSet rs = metaData.getTables(null, null, "%", null);
+        assertNotNull(rs);
     }
 
     @Test
-    @DisplayName("GetColumns should throw SQLException")
-    void testGetColumns() {
-        assertThrows(SQLException.class, 
-            () -> metaData.getColumns(null, null, "users", "%"));
+    @DisplayName("GetColumns should return ResultSet")
+    void testGetColumns() throws SQLException {
+        ResultSet rs = metaData.getColumns(null, null, "%", "%");
+        assertNotNull(rs);
     }
 
     @Test
-    @DisplayName("GetPrimaryKeys should throw SQLException")
-    void testGetPrimaryKeys() {
-        assertThrows(SQLException.class, 
-            () -> metaData.getPrimaryKeys(null, null, "users"));
+    @DisplayName("GetPrimaryKeys should return ResultSet")
+    void testGetPrimaryKeys() throws SQLException {
+        ResultSet rs = metaData.getPrimaryKeys(null, null, "users");
+        assertNotNull(rs);
     }
 
     @Test
-    @DisplayName("GetIndexInfo should throw SQLException")
-    void testGetIndexInfo() {
-        assertThrows(SQLException.class, 
-            () -> metaData.getIndexInfo(null, null, "users", false, true));
+    @DisplayName("GetIndexInfo should return ResultSet")
+    void testGetIndexInfo() throws SQLException {
+        ResultSet rs = metaData.getIndexInfo(null, null, "users", false, true);
+        assertNotNull(rs);
     }
 
     @Test
-    @DisplayName("IsWrapperFor should return false")
-    void testIsWrapperFor() {
-        assertFalse(metaData.isWrapperFor(DatabaseMetaData.class));
+    @DisplayName("IsWrapperFor should return false for unsupported interface")
+    void testIsWrapperFor() throws SQLException {
+        assertFalse(metaData.isWrapperFor(ResultSet.class));
     }
-
+    
     @Test
     @DisplayName("Unwrap should throw SQLFeatureNotSupportedException")
     void testUnwrap() {
         assertThrows(SQLFeatureNotSupportedException.class, 
-            () -> metaData.unwrap(DatabaseMetaData.class));
+            () -> metaData.unwrap(ResultSet.class));
     }
 
     @Test

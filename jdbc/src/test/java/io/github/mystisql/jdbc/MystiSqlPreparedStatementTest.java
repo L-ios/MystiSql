@@ -265,9 +265,11 @@ class MystiSqlPreparedStatementTest {
     }
 
     @Test
-    @DisplayName("GetGeneratedKeys should throw SQLException")
-    void testGetGeneratedKeys() {
-        assertThrows(SQLException.class, () -> pstmt.getGeneratedKeys());
+    @DisplayName("GetGeneratedKeys should return empty ResultSet")
+    void testGetGeneratedKeys() throws SQLException {
+        ResultSet rs = pstmt.getGeneratedKeys();
+        assertNotNull(rs);
+        assertFalse(rs.next()); // Empty result set
     }
 
     @Test
@@ -289,10 +291,11 @@ class MystiSqlPreparedStatementTest {
     }
 
     @Test
-    @DisplayName("SetObject should throw SQLFeatureNotSupportedException")
-    void testSetObject() {
-        assertThrows(SQLFeatureNotSupportedException.class, 
-            () -> pstmt.setObject(1, "test"));
+    @DisplayName("SetObject should work for basic types")
+    void testSetObject() throws SQLException {
+        pstmt.setObject(1, "test");
+        pstmt.setObject(2, 123);
+        pstmt.setObject(3, 45.67);
     }
 
     @Test

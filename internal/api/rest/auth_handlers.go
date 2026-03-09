@@ -107,7 +107,7 @@ func (h *AuthHandlers) ListTokens(c *gin.Context) {
 		tokenInfos = append(tokenInfos, RevokedTokenInfo{
 			Token:     maskedToken,
 			Reason:    item.Reason,
-			RevokedAt: item.Timestamp,
+			RevokedAt: item.RevokedAt,
 		})
 	}
 
@@ -130,7 +130,7 @@ func (h *AuthHandlers) GetTokenInfo(c *gin.Context) {
 	tokenInfo, err := h.authService.GetTokenInfo(c.Request.Context(), token)
 	if err != nil {
 		h.logger.Error("Failed to get token info", zap.Error(err))
-		
+
 		statusCode := http.StatusUnauthorized
 		errorCode := "INVALID_TOKEN"
 		if err == auth.ErrTokenExpired {
@@ -138,7 +138,7 @@ func (h *AuthHandlers) GetTokenInfo(c *gin.Context) {
 		} else if err == auth.ErrTokenRevoked {
 			errorCode = "TOKEN_REVOKED"
 		}
-		
+
 		c.JSON(statusCode, NewErrorResponse(
 			errorCode,
 			fmt.Sprintf("Failed to get token info: %v", err),

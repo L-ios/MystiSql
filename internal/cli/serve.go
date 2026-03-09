@@ -51,8 +51,8 @@ var serveCmd = &cobra.Command{
 		// 创建 query engine
 		engine := query.NewEngine(GetRegistry())
 
-		// 创建并初始化 API 服务器
-		server := rest.NewServer(&cfg.Server, GetRegistry(), engine, logger, Version)
+		// 创建并初始化 API 服务器（authService 暂时为 nil）
+		server := rest.NewServer(&cfg.Server, GetRegistry(), engine, nil, logger, Version)
 		if err := server.Setup(); err != nil {
 			return fmt.Errorf("初始化服务器失败: %w", err)
 		}

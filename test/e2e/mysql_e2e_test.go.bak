@@ -1,0 +1,289 @@
+//go:build e2e
+
+package e2e
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestMySQLConnection(t *testing.T) {
+	SkipIfShort(t)
+
+	config, err := LoadConfig()
+	require.NoError(t, err, "Failed to load config")
+
+	db := NewMySQLConnection(t, &config.MySQL)
+
+	t.Run("SuccessfulConnection", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		err := db.PingContext(ctx)
+		assert.NoError(t, err, "Should successfully ping MySQL database")
+	})
+
+	t.Run("HealthCheck", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		var result int
+		err := db.QueryRowContext(ctx, "SELECT 1").Scan(&result)
+		assert.NoError(t, err, "Health check query should succeed")
+		assert.Equal(t, 1, result, "Health check should return 1")
+	})
+}
+
+func TestMySQLConnectionPool(t *testing.T) {
+	SkipIfShort(t)
+
+	config, err := LoadConfig()
+	require.NoError(t, err, "Failed to load config")
+
+	db := NewMySQLConnection(t, &config.MySQL)
+
+	t.Run("ConcurrentConnections", func(t *testing.T) {
+		var wg sync.WaitGroup
+		errors := make(chan error, 20)
+
+		for i := 0; i < 20; i++ {
+			wg.Add(1)
+			go func(id int) {
+				defer wg.Done()
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+
+				var result int
+				err := db.QueryRowContext(ctx, "SELECT 1").Scan(&result)
+				if err != nil {
+					errors <- fmt.Errorf("goroutine %d: %w", id, err)
+				}
+			}(i)
+		}
+
+		wg.Wait()
+		close(errors)
+
+		for err := range errors {
+			t.Errorf("Concurrent query error: %v", err)
+		}
+	})
+
+	t.Run("ConnectionReuse", func(t *testing.T) {
+		ctx := context.Background()
+
+		for i := 0; i < 10; i++ {
+			var result int
+			err := db.QueryRowContext(ctx, "SELECT 1").Scan(&result)
+			require.NoError(t, err, "Query %d should succeed", i)
+		}
+
+		stats := db.Stats()
+		assert.GreaterOrEqual(t, stats.InUse, 0, "Should have connection pool stats")
+	})
+}
+
+func TestMySQLQueryExecution(t *testing.T) {
+	SkipIfShort(t)
+
+	config, err := LoadConfig()
+	require.NoError(t, err, "Failed to load config")
+
+	db := NewMySQLConnection(t, &config.MySQL)
+
+	t.Run("SelectQuery", func(t *testing.T) {
+		ctx := context.Background()
+
+		rows, err := db.QueryContext(ctx, "SELECT id, username, email FROM users LIMIT 5")
+		require.NoError(t, err, "SELECT query should succeed")
+		defer rows.Close()
+
+		count := 0
+		for rows.Next() {
+			var id int
+			var username, email string
+			err := rows.Scan(&id, &username, &email)
+			require.NoError(t, err, "Should scan row successfully")
+			assert.NotEmpty(t, username, "Username should not be empty")
+			assert.NotEmpty(t, email, "Email should not be empty")
+			count++
+		}
+		assert.GreaterOrEqual(t, count, 1, "Should return at least 1 user")
+	})
+
+	t.Run("InsertQuery", func(t *testing.T) {
+		ctx := context.Background()
+		user := GenerateTestUser()
+
+		result, err := db.ExecContext(ctx,
+			"INSERT INTO users (username, email, password_hash, full_name, age, balance, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)",
+			user.Username, user.Email, user.PasswordHash, user.FullName, user.Age, user.Balance, user.IsActive)
+		require.NoError(t, err, "INSERT query should succeed")
+
+		id, err := result.LastInsertId()
+		require.NoError(t, err, "Should get last insert ID")
+		assert.Greater(t, id, int64(0), "ID should be positive")
+
+		rowsAffected, err := result.RowsAffected()
+		require.NoError(t, err, "Should get rows affected")
+		assert.Equal(t, int64(1), rowsAffected, "Should affect 1 row")
+
+		CleanupTable(t, db, "users WHERE username = '"+user.Username+"'")
+	})
+
+	t.Run("UpdateQuery", func(t *testing.T) {
+		ctx := context.Background()
+		user := GenerateTestUser()
+
+		result, err := db.ExecContext(ctx,
+			"INSERT INTO users (username, email, password_hash, full_name, age, balance, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)",
+			user.Username, user.Email, user.PasswordHash, user.FullName, user.Age, user.Balance, user.IsActive)
+		require.NoError(t, err, "INSERT should succeed")
+		id, _ := result.LastInsertId()
+
+		updateResult, err := db.ExecContext(ctx,
+			"UPDATE users SET balance = balance + 100 WHERE id = ?", id)
+		require.NoError(t, err, "UPDATE query should succeed")
+
+		rowsAffected, _ := updateResult.RowsAffected()
+		assert.Equal(t, int64(1), rowsAffected, "Should affect 1 row")
+
+		var newBalance float64
+		err = db.QueryRowContext(ctx, "SELECT balance FROM users WHERE id = ?", id).Scan(&newBalance)
+		require.NoError(t, err, "Should query updated balance")
+		assert.Equal(t, user.Balance+100, newBalance, "Balance should be increased by 100")
+
+		CleanupTable(t, db, "users WHERE username = '"+user.Username+"'")
+	})
+
+	t.Run("DeleteQuery", func(t *testing.T) {
+		ctx := context.Background()
+		user := GenerateTestUser()
+
+		result, err := db.ExecContext(ctx,
+			"INSERT INTO users (username, email, password_hash, full_name, age, balance, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)",
+			user.Username, user.Email, user.PasswordHash, user.FullName, user.Age, user.Balance, user.IsActive)
+		require.NoError(t, err, "INSERT should succeed")
+		id, _ := result.LastInsertId()
+
+		deleteResult, err := db.ExecContext(ctx, "DELETE FROM users WHERE id = ?", id)
+		require.NoError(t, err, "DELETE query should succeed")
+
+		rowsAffected, _ := deleteResult.RowsAffected()
+		assert.Equal(t, int64(1), rowsAffected, "Should delete 1 row")
+
+		var count int
+		err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE id = ?", id).Scan(&count)
+		require.NoError(t, err, "Should query count")
+		assert.Equal(t, 0, count, "User should be deleted")
+	})
+}
+
+func TestMySQLDataTypes(t *testing.T) {
+	SkipIfShort(t)
+
+	config, err := LoadConfig()
+	require.NoError(t, err, "Failed to load config")
+
+	db := NewMySQLConnection(t, &config.MySQL)
+
+	t.Run("NullValueHandling", func(t *testing.T) {
+		ctx := context.Background()
+
+		var nullableName sql.NullString
+		var nullableAge sql.NullInt64
+
+		err := db.QueryRowContext(ctx, "SELECT full_name, age FROM users WHERE full_name IS NULL LIMIT 1").Scan(&nullableName, &nullableAge)
+		if err == sql.ErrNoRows {
+			t.Skip("No rows with NULL full_name")
+		}
+		require.NoError(t, err, "Query should succeed")
+
+		if nullableName.Valid {
+			t.Logf("Full name: %s", nullableName.String)
+		} else {
+			t.Log("Full name is NULL")
+		}
+	})
+
+	t.Run("VariousDataTypes", func(t *testing.T) {
+		ctx := context.Background()
+
+		var (
+			id        int64
+			username  string
+			balance   float64
+			isActive  bool
+			createdAt time.Time
+		)
+
+		err := db.QueryRowContext(ctx,
+			"SELECT id, username, balance, is_active, created_at FROM users LIMIT 1").
+			Scan(&id, &username, &balance, &isActive, &createdAt)
+		require.NoError(t, err, "Query with various data types should succeed")
+
+		assert.Greater(t, id, int64(0))
+		assert.NotEmpty(t, username)
+		assert.GreaterOrEqual(t, balance, float64(0))
+		assert.NotZero(t, createdAt)
+	})
+}
+
+func TestMySQLTimeout(t *testing.T) {
+	SkipIfShort(t)
+
+	config, err := LoadConfig()
+	require.NoError(t, err, "Failed to load config")
+
+	db := NewMySQLConnection(t, &config.MySQL)
+
+	t.Run("QueryTimeout", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
+		defer cancel()
+
+		time.Sleep(10 * time.Millisecond)
+
+		var result int
+		err := db.QueryRowContext(ctx, "SELECT 1").Scan(&result)
+		assert.Error(t, err, "Query should timeout")
+		assert.Equal(t, context.DeadlineExceeded, err, "Should return deadline exceeded error")
+	})
+}
+
+func TestMySQLErrorHandling(t *testing.T) {
+	SkipIfShort(t)
+
+	config, err := LoadConfig()
+	require.NoError(t, err, "Failed to load config")
+
+	db := NewMySQLConnection(t, &config.MySQL)
+
+	t.Run("InvalidSQL", func(t *testing.T) {
+		ctx := context.Background()
+
+		_, err := db.ExecContext(ctx, "INVALID SQL STATEMENT")
+		assert.Error(t, err, "Invalid SQL should return error")
+	})
+
+	t.Run("UniqueConstraintViolation", func(t *testing.T) {
+		ctx := context.Background()
+
+		_, err := db.ExecContext(ctx,
+			"INSERT INTO users (username, email, password_hash, full_name, age, balance, is_active) VALUES ('alice', 'alice@example.com', 'hash', 'Test', 30, 100, TRUE)")
+		assert.Error(t, err, "Duplicate username should return error")
+	})
+
+	t.Run("TableNotFound", func(t *testing.T) {
+		ctx := context.Background()
+
+		_, err := db.QueryContext(ctx, "SELECT * FROM nonexistent_table")
+		assert.Error(t, err, "Nonexistent table should return error")
+	})
+}

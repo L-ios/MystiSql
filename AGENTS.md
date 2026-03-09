@@ -429,4 +429,75 @@ POST /api/v1/batch {
 - **Communication**: All interactions with users should be in Chinese
 - **Generated Documents**: Should be in Chinese whenever possible
 
-This ensures consistent communication with the project maintainers and aligns with the project's target audience.
+This ensures consistent communication with the project maintainers and aligns with this project's target audience.
+
+## E2E Testing
+
+### Quick Start
+
+```bash
+# 检查测试环境
+make e2e-check
+
+# 启动测试环境
+make e2e-setup
+
+# 运行 e2e 测试
+make e2e-test
+
+# 清理测试环境
+make e2e-teardown
+
+# 重置测试数据
+make e2e-reset
+```
+
+### E2E Test Commands
+
+```bash
+# 运行所有 e2e 测试
+go test -v -tags=e2e ./test/e2e/...
+
+# 运行特定测试
+go test -v -tags=e2e -run TestMySQLBasic ./test/e2e/...
+
+# 运行并生成覆盖率报告
+make e2e-test-coverage
+```
+
+### E2E Test Guidelines
+
+When working on E2E tests:
+
+1. **Use build tags**: All e2e tests must use `//go:build e2e` tag
+2. **Skip in short mode**: Use `SkipIfShort(t)` at the beginning of each test
+3. **Clean up test data**: Always clean up inserted data after tests
+4. **Use helper functions**: Leverage existing helper functions in `test/e2e/helper.go`
+5. **Use fixtures**: Generate test data using `GenerateTestUser()`, `GenerateTestProduct()`, etc.
+6. **Document tests**: Add clear comments explaining what each test validates
+
+### E2E Test Structure
+
+- `test/e2e/config.go` - Test configuration loading
+- `test/e2e/helper.go` - Helper functions for database connections and cleanup
+- `test/e2e/fixture.go` - Test data generators
+- `test/e2e/basic_test.go` - Basic connection and query tests
+- `test/e2e/*.sql` - Database initialization scripts
+
+### Running E2E Tests in CI/CD
+
+E2E tests can be optionally run in CI/CD environments:
+
+```yaml
+# GitHub Actions example
+- name: Run E2E Tests
+  run: |
+    # Only run if Podman is available
+    if command -v podman &> /dev/null; then
+      make e2e-setup
+      make e2e-test
+      make e2e-teardown
+    fi
+```
+
+For detailed E2E testing documentation, see [test/e2e/README.md](test/e2e/README.md)

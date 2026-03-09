@@ -1,0 +1,94 @@
+# MystiSql E2E Test Configuration
+# This configuration is used for end-to-end testing with Podman containers
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  mode: "debug"
+
+# MySQL test instance configuration
+instances:
+  - name: "test-mysql"
+    type: "mysql"
+    enabled: true
+    host: "${MYSQL_HOST:127.0.0.1}"
+    port: ${MYSQL_PORT:13306}
+    username: "${MYSQL_USER:root}"
+    password: "${MYSQL_PASSWORD:test123456}"
+    database: "${MYSQL_DATABASE:mystisql_test}"
+    pool:
+      maxOpen: 20
+      maxIdle: 10
+      maxLifetime: "1h"
+      connectTimeout: "10s"
+    charset: "utf8mb4"
+    parseTime: true
+    loc: "Local"
+
+  - name: "test-postgres"
+    type: "postgresql"
+    enabled: true
+    host: "${POSTGRES_HOST:127.0.0.1}"
+    port: ${POSTGRES_PORT:15432}
+    username: "${POSTGRES_USER:postgres}"
+    password: "${POSTGRES_PASSWORD:test123456}"
+    database: "${POSTGRES_DATABASE:mystisql_test}"
+    pool:
+      maxOpen: 20
+      maxIdle: 10
+      maxLifetime: "1h"
+      connectTimeout: "10s"
+    sslmode: "disable"
+
+# Authentication configuration (for testing)
+auth:
+  enabled: true
+  token:
+    secret: "${AUTH_SECRET:e2e-test-secret-key-do-not-use-in-production}"
+    expire: "24h"
+
+# Audit logging configuration
+audit:
+  enabled: true
+  logFile: "/tmp/mystisql-e2e-audit.log"
+  retentionDays: 7
+  maxFileSize: "100MB"
+
+# SQL validator configuration
+validator:
+  enabled: true
+  dangerousOperations:
+    - "DROP"
+    - "TRUNCATE"
+    - "DELETE_WITHOUT_WHERE"
+  whitelist:
+    - "SELECT * FROM users WHERE id = 1"
+  blacklist:
+    - "DELETE FROM audit_log"
+
+# WebSocket configuration
+websocket:
+  maxConnections: 100
+  idleTimeout: "5m"
+  maxConcurrentQueries: 5
+
+# Transaction configuration
+transaction:
+  timeout: "5m"
+  maxConcurrent: 100
+
+# Batch operation configuration
+batch:
+  maxSize: 1000
+  stopOnError: false
+
+# Logging configuration
+logging:
+  level: "debug"
+  format: "console"
+  output: "stdout"
+
+# Discovery configuration (static for e2e tests)
+discovery:
+  type: "static"
+  refreshInterval: "30s"

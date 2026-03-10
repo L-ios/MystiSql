@@ -1,177 +1,176 @@
-# CLI TUI 接口规范
+# CLI TUI 功能规范
 
 ## Purpose
 
-定义 MystiSql CLI 的文本用户界面（TUI）功能，提供类似 MySQL 命令行的简洁交互式体验，包括界面布局、基本操作、命令历史和语法高亮等功能。
+定义 MystiSql CLI 的 TUI（文本用户界面）功能规范，包括界面布局、交互方式和基本操作，为用户提供直观的终端交互体验。
 
 ## Requirements
 
-### Requirement: TUI 启动和初始化
+### Requirement: TUI 命令接口
 
-系统必须提供交互式 TUI 界面供用户使用。
+系统必须提供 TUI 命令启动交互式终端界面。
 
-#### Scenario: 默认启动 TUI
+#### Scenario: 启动 TUI
 
-- **WHEN** 用户运行 `mystisql` 命令且无其他子命令
-- **THEN** 系统必须自动启动交互式 TUI 界面
-- **AND** 必须显示欢迎消息，包含配置的实例数量
-- **AND** 必须自动选择默认实例或第一个可用实例
-- **AND** 必须显示提示符格式为 `mystisql@<instance-name>`
+- **WHEN** 用户运行 `mystisql tui`
+- **THEN** 系统必须启动交互式 TUI 界面
+- **AND** 必须显示界面布局（状态栏、输入区、结果区）
+- **AND** 必须进入命令输入模式
 
-#### Scenario: 指定实例启动
+#### Scenario: 指定初始实例
 
-- **WHEN** 用户运行 `mystisql --instance <name>` 或 `mystisql tui --instance <name>`
-- **THEN** 系统必须连接到指定的数据库实例
-- **AND** 如果实例不存在，必须显示错误并退出
-- **AND** 如果连接失败，必须显示详细错误信息
-
-#### Scenario: TUI 界面布局
-
-- **WHEN** TUI 启动成功
-- **THEN** 必须显示类似 MySQL 的简洁界面
-- **AND** 不显示复杂的装饰性元素（如边框、图标等）
-- **AND** 必须支持响应式布局，适配不同终端尺寸
+- **WHEN** 用户运行 `mystisql tui --instance <instance-name>`
+- **THEN** 系统必须连接到指定实例
+- **AND** 状态栏必须显示当前实例名称
+- **AND** 如果实例不存在，必须显示错误信息
 
 ---
 
-### Requirement: SQL 执行和结果显示
+### Requirement: 界面布局
 
-系统必须支持在 TUI 中执行 SQL 并显示结果。
+系统必须提供清晰的多区域界面布局。
 
-#### Scenario: 执行单行 SQL
+#### Scenario: 顶部状态栏
 
-- **WHEN** 用户在提示符后输入 SQL 语句并按 Enter
-- **THEN** 系统必须执行该 SQL 语句
-- **AND** 必须以表格形式显示查询结果
-- **AND** 必须显示结果行数和执行时间
-- **AND** 提示符必须重新出现等待下一个命令
+- **WHEN** TUI 启动后
+- **THEN** 顶部必须显示状态栏
+- **AND** 状态栏必须包含：当前实例名、数据库名、连接状态
+- **AND** 状态栏必须实时更新
 
-#### Scenario: 执行 INSERT/UPDATE/DELETE
+#### Scenario: 主输入区域
 
-- **WHEN** 用户执行数据修改语句（INSERT/UPDATE/DELETE）
-- **THEN** 系统必须显示受影响的行数
-- **AND** 如果有最后插入 ID，必须显示该 ID
-- **AND** 必须显示执行时间
+- **WHEN** TUI 启动后
+- **THEN** 必须提供主输入区域用于输入 SQL 命令
+- **AND** 输入区域必须支持多行输入
+- **AND** 输入区域必须有明显的视觉边界
 
-#### Scenario: 显示错误信息
+#### Scenario: 结果显示区域
 
-- **WHEN** SQL 执行失败
-- **THEN** 系统必须显示清晰的错误消息
-- **AND** 错误消息必须包含错误类型和详细描述
-- **AND** 必须立即返回提示符，允许用户继续输入
+- **WHEN** TUI 启动后
+- **THEN** 必须提供结果显示区域
+- **AND** 结果区域必须支持表格形式展示
+- **AND** 结果区域必须支持滚动查看
+
+#### Scenario: 底部状态栏
+
+- **WHEN** TUI 启动后
+- **THEN** 底部必须显示状态栏
+- **AND** 必须显示当前操作状态
+- **AND** 必须显示快捷键提示
 
 ---
 
-### Requirement: 实例切换
+### Requirement: 基本操作
 
-系统必须支持在 TUI 中切换数据库实例。
+系统必须支持基本的 TUI 操作。
 
-#### Scenario: 使用 Tab 键切换实例
+#### Scenario: 执行 SQL 命令
 
-- **WHEN** 用户按 Tab 键
-- **THEN** 系统必须切换到下一个可用的数据库实例
-- **AND** 提示符必须更新为新实例名称
-- **AND** 如果只有一个实例，Tab 键无效
+- **WHEN** 用户在输入区域输入 SQL 后按 Enter 键
+- **THEN** 系统必须执行该 SQL 命令
+- **AND** 必须在结果区域显示执行结果
+- **AND** 必须更新状态栏显示执行状态
 
-#### Scenario: 显示实例列表
+#### Scenario: 取消当前输入
 
-- **WHEN** 用户输入 `show instances` 命令
-- **THEN** 系统必须显示所有配置的实例列表
-- **AND** 列表必须包含实例名称、类型和状态
-- **AND** 必须标记当前激活的实例
+- **WHEN** 用户按 Ctrl+C
+- **THEN** 系统必须取消当前输入
+- **AND** 输入区域必须清空
+- **AND** 状态栏必须显示"已取消"消息
+
+#### Scenario: 退出 TUI
+
+- **WHEN** 用户按 Ctrl+D 或输入 `exit` 命令
+- **THEN** 系统必须退出 TUI 界面
+- **AND** 必须返回到命令行
+
+#### Scenario: 清屏
+
+- **WHEN** 用户按 Ctrl+L
+- **THEN** 系统必须清空结果显示区域
+- **AND** 输入区域必须保持不变
 
 ---
 
 ### Requirement: 命令历史
 
-系统必须维护 SQL 命令历史。
+系统必须支持命令历史功能。
+
+#### Scenario: 保存历史记录
+
+- **WHEN** 用户执行 SQL 命令
+- **THEN** 系统必须将该命令保存到历史记录
+- **AND** 历史记录必须包含时间戳
+- **AND** 历史记录必须去重
 
 #### Scenario: 浏览历史命令
 
 - **WHEN** 用户按上/下箭头键
-- **THEN** 系统必须在命令历史中导航
-- **AND** 上键显示更早的命令
-- **AND** 下键显示更新的命令
+- **THEN** 系统必须显示历史命令
+- **AND** 上箭头必须显示更早的命令
+- **AND** 下箭头必须显示更近的命令
 
-#### Scenario: 持久化历史记录
+#### Scenario: 历史持久化
 
-- **WHEN** 用户执行 SQL 命令
-- **THEN** 系统必须将命令保存到历史文件（~/.mystisql_history）
-- **AND** 历史文件必须按时间顺序保存
-- **AND** 重启 TUI 后必须能访问历史命令
-
-#### Scenario: 历史记录限制
-
-- **WHEN** 历史记录超过 1000 条
-- **THEN** 系统必须删除最旧的记录
-- **AND** 必须保持历史文件大小合理
+- **WHEN** TUI 退出时
+- **THEN** 系统必须将历史记录保存到本地文件
+- **AND** 下次启动时必须加载历史记录
+- **AND** 历史文件必须位于用户主目录（如 ~/.mystisql/history）
 
 ---
 
 ### Requirement: SQL 语法高亮
 
-系统必须提供 SQL 语法高亮功能。
+系统必须支持 SQL 语法高亮。
 
-#### Scenario: 高亮 SQL 关键字
+#### Scenario: 关键字高亮
 
-- **WHEN** 用户输入 SQL 语句
-- **THEN** SQL 关键字（SELECT, FROM, WHERE 等）必须以不同颜色显示
-- **AND** 函数名必须以另一种颜色显示
-- **AND** 字符串必须用引号颜色标识
+- **WHEN** 用户输入 SQL 命令
+- **THEN** SQL 关键字必须以不同颜色显示
+- **AND** 关键字包括：SELECT、FROM、WHERE、INSERT、UPDATE、DELETE 等
+- **AND** 关键字必须不区分大小写
 
-#### Scenario: 支持多种 SQL 方言
+#### Scenario: 函数名高亮
+
+- **WHEN** 用户输入 SQL 函数
+- **THEN** 函数名必须以不同颜色显示
+- **AND** 函数名必须包括常见数据库函数
+
+#### Scenario: 字符串高亮
+
+- **WHEN** 用户输入字符串字面量
+- **THEN** 字符串必须以不同颜色显示
+- **AND** 必须支持单引号和双引号字符串
+
+#### Scenario: 多数据库方言支持
 
 - **WHEN** 连接到不同类型的数据库
-- **THEN** 语法高亮必须适配该数据库的 SQL 方言
-- **AND** MySQL、PostgreSQL、Oracle 的特定关键字必须被正确识别
+- **THEN** 语法高亮必须适配对应数据库的 SQL 方言
+- **AND** 必须支持 MySQL、PostgreSQL、Oracle 等方言
 
 ---
 
-### Requirement: 快捷键和特殊命令
+### Requirement: 错误处理
 
-系统必须支持快捷键和特殊命令。
+系统必须提供清晰的错误显示。
 
-#### Scenario: 退出 TUI
+#### Scenario: 显示错误信息
 
-- **WHEN** 用户输入 `exit`、`quit` 或按 Ctrl+C
-- **THEN** 系统必须退出 TUI
-- **AND** 必须清理资源并关闭连接
+- **WHEN** SQL 执行失败
+- **THEN** 系统必须在结果区域显示错误信息
+- **AND** 错误信息必须用红色高亮显示
+- **AND** 必须包含错误类型和描述
 
-#### Scenario: 清屏
+#### Scenario: 错误定位
 
-- **WHEN** 用户按 Ctrl+L 或输入 `clear`
-- **THEN** 系统必须清除屏幕内容
-- **AND** 必须保留提示符
+- **WHEN** SQL 语法错误
+- **THEN** 系统必须指出错误位置
+- **AND** 必须高亮显示错误的 SQL 片段
+- **AND** 必须显示行号和列号（如果可用）
 
-#### Scenario: 显示帮助
+#### Scenario: 错误恢复
 
-- **WHEN** 用户输入 `help` 或 `?`
-- **THEN** 系统必须显示帮助信息
-- **AND** 帮助信息必须包含常用命令和快捷键列表
-
-#### Scenario: 导出结果
-
-- **WHEN** 用户按 Ctrl+E
-- **THEN** 系统必须提示用户选择导出格式（CSV、JSON）
-- **AND** 必须提示输入文件名
-- **AND** 必须将最后的查询结果保存到指定文件
-
----
-
-### Requirement: 依赖注入和配置
-
-系统必须使用依赖注入方式管理 TUI 组件。
-
-#### Scenario: 使用配置系统
-
-- **WHEN** TUI 初始化
-- **THEN** 必须从配置系统读取实例配置
-- **AND** 必须使用实例注册中心（InstanceRegistry）获取实例
-- **AND** 不得硬编码任何配置
-
-#### Scenario: 无配置时的处理
-
-- **WHEN** 未找到配置文件
-- **THEN** 系统必须显示错误消息
-- **AND** 必须提示用户如何创建配置文件
-- **AND** 必须以非零状态码退出
+- **WHEN** 发生错误后
+- **THEN** 用户必须能够继续输入新的 SQL 命令
+- **AND** TUI 界面必须保持正常
+- **AND** 连接状态必须保持（除非连接断开）

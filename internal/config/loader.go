@@ -94,9 +94,21 @@ func LoadFromPath(configPath string) (*types.Config, error) {
 }
 
 // LoadDefault 使用默认路径加载配置
+// 如果找不到配置文件，返回带有默认值的配置
 func LoadDefault() (*types.Config, error) {
 	loader := NewLoader()
-	return loader.Load("")
+
+	// 尝试从默认路径加载配置文件
+	cfg, err := loader.Load("")
+	if err != nil {
+		// 如果是配置文件不存在的错误，返回默认配置
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			return types.NewConfig(), nil
+		}
+		return nil, err
+	}
+
+	return cfg, nil
 }
 
 // Validate 验证配置的有效性

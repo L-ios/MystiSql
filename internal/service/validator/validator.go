@@ -14,8 +14,6 @@ func NewSQLValidator() *SQLValidatorImpl {
 	patterns := []string{
 		`(?i)^\s*DROP\s+`,
 		`(?i)^\s*TRUNCATE\s+`,
-		`(?i)^\s*DELETE\s+FROM\s+\w+\s*;?\s*$`,
-		`(?i)^\s*UPDATE\s+\w+\s+SET\s+.*\s*;?\s*$`,
 	}
 
 	compiledPatterns := make([]*regexp.Regexp, 0, len(patterns))

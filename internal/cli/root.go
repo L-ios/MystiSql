@@ -38,16 +38,18 @@ var rootCmd = &cobra.Command{
 		rootCtx, rootCancel = context.WithCancel(context.Background())
 
 		// 加载配置
+		var err error
 		if cfgFile != "" {
-			var err error
 			cfg, err = config.LoadFromPath(cfgFile)
 			if err != nil {
 				return fmt.Errorf("加载配置失败: %w", err)
 			}
 			GetSugar().Debugf("从文件加载配置: %s", cfgFile)
 		} else {
-			// 使用默认配置
-			cfg = types.NewConfig()
+			cfg, err = config.LoadDefault()
+			if err != nil {
+				return fmt.Errorf("加载默认配置失败: %w", err)
+			}
 			GetSugar().Debug("使用默认配置")
 		}
 
@@ -93,6 +95,9 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "配置文件路径")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "详细日志输出")
 	rootCmd.PersistentFlags().StringVar(&tokenFlag, "token", "", "认证 Token")
+
+	// 添加 TUI 命令
+	rootCmd.AddCommand(NewTUICmd())
 }
 
 // GetConfig 获取配置

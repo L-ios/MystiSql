@@ -28,6 +28,9 @@ func (e *PostgreSQLError) Unwrap() error {
 }
 
 func IsUniqueViolation(err error) bool {
+	if pe, ok := err.(*PostgreSQLError); ok {
+		return pe.Code == "23505"
+	}
 	var pgErr *pgconn.PgError
 	if AsPgError(err, &pgErr) {
 		return pgErr.Code == "23505"
@@ -36,6 +39,9 @@ func IsUniqueViolation(err error) bool {
 }
 
 func IsForeignKeyViolation(err error) bool {
+	if pe, ok := err.(*PostgreSQLError); ok {
+		return pe.Code == "23503"
+	}
 	var pgErr *pgconn.PgError
 	if AsPgError(err, &pgErr) {
 		return pgErr.Code == "23503"
@@ -44,6 +50,9 @@ func IsForeignKeyViolation(err error) bool {
 }
 
 func IsCheckViolation(err error) bool {
+	if pe, ok := err.(*PostgreSQLError); ok {
+		return pe.Code == "23514"
+	}
 	var pgErr *pgconn.PgError
 	if AsPgError(err, &pgErr) {
 		return pgErr.Code == "23514"
@@ -52,6 +61,9 @@ func IsCheckViolation(err error) bool {
 }
 
 func IsNotNullViolation(err error) bool {
+	if pe, ok := err.(*PostgreSQLError); ok {
+		return pe.Code == "23502"
+	}
 	var pgErr *pgconn.PgError
 	if AsPgError(err, &pgErr) {
 		return pgErr.Code == "23502"
@@ -60,6 +72,9 @@ func IsNotNullViolation(err error) bool {
 }
 
 func IsSyntaxError(err error) bool {
+	if pe, ok := err.(*PostgreSQLError); ok {
+		return pe.Code == "42601"
+	}
 	var pgErr *pgconn.PgError
 	if AsPgError(err, &pgErr) {
 		return pgErr.Code == "42601"
@@ -68,6 +83,9 @@ func IsSyntaxError(err error) bool {
 }
 
 func IsUndefinedTable(err error) bool {
+	if pe, ok := err.(*PostgreSQLError); ok {
+		return pe.Code == "42P01"
+	}
 	var pgErr *pgconn.PgError
 	if AsPgError(err, &pgErr) {
 		return pgErr.Code == "42P01"
@@ -76,6 +94,9 @@ func IsUndefinedTable(err error) bool {
 }
 
 func IsUndefinedColumn(err error) bool {
+	if pe, ok := err.(*PostgreSQLError); ok {
+		return pe.Code == "42703"
+	}
 	var pgErr *pgconn.PgError
 	if AsPgError(err, &pgErr) {
 		return pgErr.Code == "42703"
@@ -91,6 +112,10 @@ func AsPgError(err error, pgErr **pgconn.PgError) bool {
 	if p, ok := err.(*pgconn.PgError); ok {
 		*pgErr = p
 		return true
+	}
+
+	if pe, ok := err.(*PostgreSQLError); ok {
+		return AsPgError(pe.Original, pgErr)
 	}
 
 	return false
@@ -118,6 +143,27 @@ func WrapError(err error) error {
 }
 
 func GetErrorDetail(err error) map[string]string {
+	if pe, ok := err.(*PostgreSQLError); ok {
+		detail := make(map[string]string)
+		detail["code"] = pe.Code
+		detail["message"] = pe.Message
+
+		if pe.Detail != "" {
+			detail["detail"] = pe.Detail
+		}
+		if pe.Constraint != "" {
+			detail["constraint"] = pe.Constraint
+		}
+		if pe.Table != "" {
+			detail["table"] = pe.Table
+		}
+		if pe.Column != "" {
+			detail["column"] = pe.Column
+		}
+
+		return detail
+	}
+
 	var pgErr *pgconn.PgError
 	if !AsPgError(err, &pgErr) {
 		return nil

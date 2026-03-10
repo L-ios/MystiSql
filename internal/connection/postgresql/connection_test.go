@@ -2,6 +2,7 @@ package postgresql
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -55,6 +56,7 @@ func TestConnection_BuildDSN(t *testing.T) {
 			},
 			wantContains: []string{
 				"postgres://testuser:testpass@localhost:5432/testdb",
+				"sslmode=disable",
 			},
 		},
 		{
@@ -65,10 +67,13 @@ func TestConnection_BuildDSN(t *testing.T) {
 				Database: "proddb",
 				Username: "produser",
 				Password: "prodpass",
+				Labels: map[string]string{
+					"sslmode": "require",
+				},
 			},
 			wantContains: []string{
 				"postgres://produser:prodpass@prod-server:5432/proddb",
-				"sslmode=",
+				"sslmode=require",
 			},
 		},
 	}
@@ -81,7 +86,13 @@ func TestConnection_BuildDSN(t *testing.T) {
 				t.Fatalf("NewConnection() error: %v", err)
 			}
 
-			dsn, err := conn.buildDSN(tt.instance)
+			// 转换为具体类型以调用私有方法
+			postgresConn, ok := conn.(*Connection)
+			if !ok {
+				t.Fatalf("failed to convert to *Connection")
+			}
+
+			dsn, err := postgresConn.buildDSN(tt.instance)
 			if err != nil {
 				t.Fatalf("buildDSN() error: %v", err)
 			}
@@ -96,7 +107,7 @@ func TestConnection_BuildDSN(t *testing.T) {
 }
 
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && contains(s[1:], substr))
+	return strings.Contains(s, substr)
 }
 
 func TestPostgreSQLError_Error(t *testing.T) {

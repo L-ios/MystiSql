@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"MystiSql/internal/service/auth"
 
@@ -18,7 +19,7 @@ func init() {
 
 func TestAuthMiddleware_MissingToken(t *testing.T) {
 	logger := zap.NewNop()
-	authService, _ := auth.NewAuthService("test-secret", 3600)
+	authService, _ := auth.NewAuthService("test-secret", 3600*time.Second)
 
 	router := gin.New()
 	router.Use(AuthMiddleware(authService, logger))
@@ -38,7 +39,7 @@ func TestAuthMiddleware_MissingToken(t *testing.T) {
 
 func TestAuthMiddleware_InvalidToken(t *testing.T) {
 	logger := zap.NewNop()
-	authService, _ := auth.NewAuthService("test-secret", 3600)
+	authService, _ := auth.NewAuthService("test-secret", 3600*time.Second)
 
 	router := gin.New()
 	router.Use(AuthMiddleware(authService, logger))
@@ -59,7 +60,7 @@ func TestAuthMiddleware_InvalidToken(t *testing.T) {
 
 func TestAuthMiddleware_ValidToken(t *testing.T) {
 	logger := zap.NewNop()
-	authService, _ := auth.NewAuthService("test-secret", 3600)
+	authService, _ := auth.NewAuthService("test-secret", 3600*time.Second)
 
 	token, err := authService.GenerateToken(context.Background(), "test-user", "admin")
 	if err != nil {
@@ -92,7 +93,7 @@ func TestAuthMiddleware_ValidToken(t *testing.T) {
 
 func TestAuthMiddlewareWithWhitelist_WhitelistedPath(t *testing.T) {
 	logger := zap.NewNop()
-	authService, _ := auth.NewAuthService("test-secret", 3600)
+	authService, _ := auth.NewAuthService("test-secret", 3600*time.Second)
 
 	router := gin.New()
 	router.Use(AuthMiddlewareWithWhitelist(authService, logger, []string{"/health"}))
@@ -112,7 +113,7 @@ func TestAuthMiddlewareWithWhitelist_WhitelistedPath(t *testing.T) {
 
 func TestAuthMiddlewareWithWhitelist_DefaultWhitelist(t *testing.T) {
 	logger := zap.NewNop()
-	authService, _ := auth.NewAuthService("test-secret", 3600)
+	authService, _ := auth.NewAuthService("test-secret", 3600*time.Second)
 
 	router := gin.New()
 	router.Use(AuthMiddlewareWithWhitelist(authService, logger, []string{}))
@@ -132,7 +133,7 @@ func TestAuthMiddlewareWithWhitelist_DefaultWhitelist(t *testing.T) {
 
 func TestAuthMiddlewareWithWhitelist_NonWhitelistedPath(t *testing.T) {
 	logger := zap.NewNop()
-	authService, _ := auth.NewAuthService("test-secret", 3600)
+	authService, _ := auth.NewAuthService("test-secret", 3600*time.Second)
 
 	router := gin.New()
 	router.Use(AuthMiddlewareWithWhitelist(authService, logger, []string{"/health"}))
@@ -264,7 +265,7 @@ func TestGetDefaultWhitelistPaths(t *testing.T) {
 
 func TestAuthMiddleware_RevokedToken(t *testing.T) {
 	logger := zap.NewNop()
-	authService, _ := auth.NewAuthService("test-secret", 3600)
+	authService, _ := auth.NewAuthService("test-secret", 3600*time.Second)
 
 	token, err := authService.GenerateToken(context.Background(), "test-user", "admin")
 	if err != nil {

@@ -61,12 +61,12 @@ func (c *Connection) Connect(ctx context.Context) error {
 
 	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
-		return fmt.Errorf("failed to create connection pool: %w", errors.ErrConnectionFailed, err)
+		return fmt.Errorf("failed to create connection pool: %w", err)
 	}
 
 	if err := pool.Ping(ctx); err != nil {
 		pool.Close()
-		return fmt.Errorf("failed to validate connection: %w", errors.ErrConnectionFailed, err)
+		return fmt.Errorf("failed to validate connection: %w", err)
 	}
 
 	c.pool = pool
@@ -168,6 +168,9 @@ func (c *Connection) buildDSN(instance *types.DatabaseInstance) (string, error) 
 	queryParams := make([]string, 0)
 	if sslMode, ok := instance.Labels["sslmode"]; ok {
 		queryParams = append(queryParams, fmt.Sprintf("sslmode=%s", sslMode))
+	} else {
+		// 默认添加 sslmode=disable
+		queryParams = append(queryParams, "sslmode=disable")
 	}
 
 	if connectTimeout, ok := instance.Labels["connect_timeout"]; ok {

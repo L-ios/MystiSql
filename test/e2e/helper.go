@@ -3,9 +3,13 @@
 package e2e
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"testing"
 	"time"
 
@@ -13,6 +17,78 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/require"
 )
+
+type APIClient struct {
+	baseURL    string
+	token      string
+	httpClient *http.Client
+}
+
+func NewAPIClient(baseURL string) *APIClient {
+	return &APIClient{
+		baseURL: baseURL,
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+	}
+}
+
+func (c *APIClient) SetToken(token string) {
+	c.token = token
+}
+
+func (c *APIClient) Post(path string, body interface{}) (*http.Response, error) {
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(context.Background(), "POST", c.baseURL+path, bytes.NewReader(jsonBody))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if c.token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+	return c.httpClient.Do(req)
+}
+
+func (c *APIClient) Get(path string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(context.Background(), "GET", c.baseURL+path, nil)
+	if err != nil {
+		return nil, err
+	}
+	if c.token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+	return c.httpClient.Do(req)
+}
+
+func (c *APIClient) Delete(path string, body interface{}) (*http.Response, error) {
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(context.Background(), "DELETE", c.baseURL+path, bytes.NewReader(jsonBody))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if c.token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+	return c.httpClient.Do(req)
+}
+
+func ParseJSONResponse(t *testing.T, resp *http.Response) map[string]interface{} {
+	t.Helper()
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	var result map[string]interface{}
+	err = json.Unmarshal(body, &result)
+	require.NoError(t, err, "Response body: %s", string(body))
+	return result
+}
 
 func NewMySQLConnection(t *testing.T, config *MySQLConfig) *sql.DB {
 	t.Helper()

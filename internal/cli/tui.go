@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"MystiSql/internal/discovery"
 	"MystiSql/internal/service/query"
 	"MystiSql/pkg/types"
 	"context"
@@ -10,7 +11,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/spf13/cobra"
 )
 
 // TUIApp TUI 应用结构
@@ -19,11 +19,10 @@ type TUIApp struct {
 }
 
 // NewTUIApp 创建 TUI 应用
-func NewTUIApp() *TUIApp {
-	// 初始化 bubbletea 应用
+func NewTUIApp(cfg *types.Config, reg discovery.InstanceRegistry) *TUIApp {
+	// 初始化 bubbletea 应用（不使用 AltScreen，保持简单界面）
 	app := tea.NewProgram(
-		initialModel(),
-		tea.WithAltScreen(),
+		initialModel(cfg, reg),
 		tea.WithMouseCellMotion(),
 	)
 
@@ -38,18 +37,26 @@ func (a *TUIApp) Run() error {
 }
 
 // initialModel 创建初始模型
-func initialModel() tea.Model {
+func initialModel(cfg *types.Config, reg discovery.InstanceRegistry) tea.Model {
 	// 这里将实现 TUI 模型
-	return &model{}
+	return &model{
+		config:   cfg,
+		registry: reg,
+	}
 }
 
 // model TUI 模型
 type model struct {
+	// 配置和依赖
+	config   *types.Config
+	registry discovery.InstanceRegistry
 	// 界面状态
 	width  int
 	height int
 	// 输入状态
 	input string
+	// 光标位置
+	cursor int
 	// 结果状态
 	results string
 	// 错误信息
@@ -76,28 +83,53 @@ type model struct {
 	showExportOptions bool
 	// 当前选中的导出格式索引
 	selectedExportFormat int
+	// 显示帮助
+	showHelp bool
+	// 最小窗口尺寸警告
+	minSizeWarning bool
+	// 是否已显示欢迎信息
+	welcomeShown bool
 }
 
 // Init 初始化模型
 func (m *model) Init() tea.Cmd {
 	// 初始化查询引擎
-	m.queryEngine = query.NewEngine(GetRegistry())
-	// 设置默认实例
-	m.instance = "local-mysql"
-	// 初始化实例列表
-	m.instances = []string{"local-mysql", "local-postgres", "local-oracle", "local-redis"}
-	// 设置默认选中的实例
-	m.selectedInstance = 0
-	// 初始化命令历史
-	m.history = []string{}
-	// 初始化历史索引
-	m.historyIndex = -1
+	m.queryEngine = query.NewEngine(m.registry)
+
+	// 从注册中心获取实例列表
+	instances, err := m.registry.ListInstances()
+	if err != nil || len(instances) == 0 {
+		// 如果获取失败或没有实例，设置默认值
+		m.instances = []string{}
+		m.instance = ""
+		m.errorMsg = "警告: 未配置任何数据库实例，请先在配置文件中添加实例"
+	} else {
+		// 提取实例名称
+		m.instances = make([]string, len(instances))
+		for i, inst := range instances {
+			m.instances[i] = inst.Name
+		}
+		// 设置默认实例为第一个
+		m.instance = instances[0].Name
+		m.selectedInstance = 0
+	}
+
+	// 初始化命令历史（如果未设置）
+	if m.history == nil {
+		m.history = []string{}
+	}
+	// 初始化历史索引（如果未设置）
+	if m.historyIndex == 0 {
+		m.historyIndex = -1
+	}
 	// 初始化导出格式
 	m.exportFormat = "csv"
 	// 初始化导出选项显示
 	m.showExportOptions = false
 	// 初始化选中的导出格式索引
 	m.selectedExportFormat = 0
+	// 初始化光标位置
+	m.cursor = 0
 	return nil
 }
 
@@ -109,6 +141,12 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 	case tea.KeyMsg:
+		// 如果显示帮助，按任意键关闭
+		if m.showHelp {
+			m.showHelp = false
+			return m, nil
+		}
+
 		// 处理键盘输入
 		switch msg.String() {
 		case "ctrl+c":
@@ -117,16 +155,19 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "tab":
 			// 显示/隐藏实例列表
 			m.showInstanceList = !m.showInstanceList
-		case "e":
+		case "ctrl+e":
 			// 显示/隐藏导出选项
 			m.showExportOptions = !m.showExportOptions
+		case "?":
+			// 显示/隐藏帮助
+			m.showHelp = !m.showHelp
 		case "enter":
 			// 处理输入
 			if m.showInstanceList {
 				// 确认选择实例
 				if m.selectedInstance >= 0 && m.selectedInstance < len(m.instances) {
 					m.instance = m.instances[m.selectedInstance]
-					m.results = fmt.Sprintf("已切换到实例: %s", m.instance)
+					m.results = ""
 				}
 				m.showInstanceList = false
 			} else if m.showExportOptions {
@@ -250,32 +291,19 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // 定义样式
 var (
-	// 顶部状态栏样式
-	topBarStyle = lipgloss.NewStyle().
-			Background(lipgloss.Color("#336699")).
-			Foreground(lipgloss.Color("#ffffff")).
-			Padding(0, 2).
+	promptStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#00ff00")).
 			Bold(true)
 
-	// 底部状态栏样式
-	bottomBarStyle = lipgloss.NewStyle().
-			Background(lipgloss.Color("#333333")).
-			Foreground(lipgloss.Color("#ffffff")).
-			Padding(0, 2)
+	errorStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#ff0000"))
 
-	// 输入区域样式
-	inputStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#666666")).
-			Padding(1, 2)
+	instanceStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#00bfff"))
 
-	// 结果区域样式
-	resultsStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#666666")).
-			Padding(1, 2).
-			Background(lipgloss.Color("#f5f5f5")).
-			Foreground(lipgloss.Color("#333333"))
+	hintStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#888888")).
+			Italic(true)
 )
 
 // formatQueryResult 格式化查询结果
@@ -340,116 +368,139 @@ func formatExecResult(result *types.ExecResult) string {
 
 // highlightSQL 高亮 SQL 代码
 func highlightSQL(sql string) string {
-	// 暂时返回原始 SQL，因为 chroma/v2 的终端格式化器路径有问题
 	return sql
+}
+
+type layout struct {
+	topBar    int
+	results   int
+	input     int
+	bottomBar int
+}
+
+func (m *model) calculateLayout() layout {
+	l := layout{
+		topBar:    1,
+		bottomBar: 1,
+		input:     5,
+	}
+
+	if m.height <= 0 {
+		return l
+	}
+
+	availableHeight := m.height - l.topBar - l.bottomBar
+	if availableHeight > l.input {
+		l.results = availableHeight - l.input
+	} else {
+		l.results = 1
+	}
+
+	return l
 }
 
 // View 渲染视图
 func (m *model) View() string {
-	// 计算各区域高度
-	contentHeight := m.height - 4 // 减去顶部和底部状态栏
-	_ = contentHeight             // 避免未使用的变量警告
-	inputHeight := 5
-	_ = inputHeight // 避免未使用的变量警告
+	var view strings.Builder
 
-	// 顶部状态栏
-	topBar := topBarStyle.Render(fmt.Sprintf("MystiSql TUI | 当前实例: %s", m.instance))
+	if !m.welcomeShown {
+		view.WriteString("\n")
+		view.WriteString(promptStyle.Render("Welcome to the MystiSql monitor."))
+		view.WriteString(" Commands end with Enter.")
+		view.WriteString("\n")
 
-	// 结果区域
-	resultContent := m.results
-	if m.errorMsg != "" {
-		resultContent = "错误: " + m.errorMsg
-	} else if m.isExecuting {
-		resultContent = "执行中..."
+		instanceCount := len(m.instances)
+		view.WriteString(fmt.Sprintf("Your MystiSql connection has %d instance(s) configured.\n", instanceCount))
+
+		if m.instance != "" {
+			view.WriteString(hintStyle.Render("Current instance: ") + instanceStyle.Render(m.instance))
+			view.WriteString("\n")
+		}
+
+		view.WriteString("\n")
+		view.WriteString(hintStyle.Render("Type 'help' or '?' for help. Type 'exit' or Ctrl+C to quit."))
+		view.WriteString("\n\n")
+
+		m.welcomeShown = true
 	}
 
-	// 实例列表
-	var instanceList string
+	if m.showHelp {
+		view.WriteString("\n")
+		view.WriteString(hintStyle.Render("快捷键:"))
+		view.WriteString("\n")
+		view.WriteString("  Enter      - 执行 SQL\n")
+		view.WriteString("  Tab        - 切换实例\n")
+		view.WriteString("  Ctrl+E     - 导出结果\n")
+		view.WriteString("  Ctrl+C     - 退出\n")
+		view.WriteString("  ↑/↓        - 浏览历史\n")
+		view.WriteString("\n")
+		view.WriteString(hintStyle.Render("按任意键关闭帮助"))
+		view.WriteString("\n\n")
+		return view.String()
+	}
+
 	if m.showInstanceList {
-		var listContent strings.Builder
-		listContent.WriteString("可用实例:\n")
+		view.WriteString("\n")
+		view.WriteString(instanceStyle.Render("可用实例:"))
+		view.WriteString("\n")
 		for i, instance := range m.instances {
 			if i == m.selectedInstance {
-				listContent.WriteString(fmt.Sprintf("→ %s\n", instance))
+				view.WriteString(fmt.Sprintf("→ %s\n", instance))
 			} else {
-				listContent.WriteString(fmt.Sprintf("  %s\n", instance))
+				view.WriteString(fmt.Sprintf("  %s\n", instance))
 			}
 		}
-		listContent.WriteString("\n按 Enter 选择，按 Esc 取消")
-		instanceList = resultsStyle.Render(listContent.String())
+		view.WriteString("\n")
+		view.WriteString(hintStyle.Render("按 Enter 选择，按 Esc 取消"))
+		view.WriteString("\n\n")
+		return view.String()
 	}
 
-	// 导出选项
-	var exportOptions string
 	if m.showExportOptions {
-		var listContent strings.Builder
+		view.WriteString("\n")
+		view.WriteString(instanceStyle.Render("导出格式:"))
+		view.WriteString("\n")
 		exportFormats := []string{"csv", "json", "table"}
-		listContent.WriteString("导出格式:\n")
 		for i, format := range exportFormats {
 			if i == m.selectedExportFormat {
-				listContent.WriteString(fmt.Sprintf("→ %s\n", format))
+				view.WriteString(fmt.Sprintf("→ %s\n", format))
 			} else {
-				listContent.WriteString(fmt.Sprintf("  %s\n", format))
+				view.WriteString(fmt.Sprintf("  %s\n", format))
 			}
 		}
-		listContent.WriteString("\n按 Enter 选择，按 Esc 取消")
-		exportOptions = resultsStyle.Render(listContent.String())
+		view.WriteString("\n")
+		view.WriteString(hintStyle.Render("按 Enter 选择，按 Esc 取消"))
+		view.WriteString("\n\n")
+		return view.String()
 	}
 
-	// 输入区域
-	highlightedInput := highlightSQL(m.input)
-	input := inputStyle.Render(fmt.Sprintf("SQL> %s", highlightedInput))
+	if m.results != "" {
+		view.WriteString(m.results)
+		view.WriteString("\n\n")
+	}
 
-	// 底部状态栏
-	bottomBar := bottomBarStyle.Render("按 Enter 执行 SQL | 按 Tab 切换实例 | 按 e 导出结果 | 按 Ctrl+C 退出")
+	if m.errorMsg != "" {
+		view.WriteString(errorStyle.Render("ERROR: " + m.errorMsg))
+		view.WriteString("\n\n")
+	}
 
-	// 组合所有区域
-	var mainContent string
-	if m.showInstanceList {
-		mainContent = lipgloss.JoinVertical(
-			lipgloss.Top,
-			instanceList,
-			input,
-		)
-	} else if m.showExportOptions {
-		mainContent = lipgloss.JoinVertical(
-			lipgloss.Top,
-			exportOptions,
-			input,
-		)
+	if m.isExecuting {
+		view.WriteString(hintStyle.Render("执行中..."))
+		view.WriteString("\n\n")
+	}
+
+	if m.instance != "" {
+		view.WriteString(promptStyle.Render("mystisql"))
+		view.WriteString("@")
+		view.WriteString(instanceStyle.Render(m.instance))
+		view.WriteString("> ")
 	} else {
-		mainContent = lipgloss.JoinVertical(
-			lipgloss.Top,
-			resultsStyle.Render(resultContent),
-			input,
-		)
+		view.WriteString(promptStyle.Render("mystisql"))
+		view.WriteString("> ")
 	}
 
-	return lipgloss.JoinVertical(
-		lipgloss.Top,
-		topBar,
-		mainContent,
-		bottomBar,
-	)
-}
+	view.WriteString(highlightSQL(m.input))
+	view.WriteString("_")
 
-// NewTUICmd 创建 TUI 命令
-func NewTUICmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "tui",
-		Short: "启动交互式 TUI 界面",
-		Long:  `启动交互式 TUI 界面，支持 SQL 执行、结果显示和实例切换`,
-		Run: func(cmd *cobra.Command, args []string) {
-			// 启动 TUI 应用
-			app := NewTUIApp()
-			if err := app.Run(); err != nil {
-				cmd.Println("启动 TUI 界面失败:", err)
-			}
-		},
-	}
-
-	// 添加 --instance 参数
-	cmd.Flags().StringP("instance", "i", "", "指定初始数据库实例")
-
-	return cmd
+	return view.String()
 }

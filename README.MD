@@ -1179,6 +1179,97 @@ instances:
 
 ### CLI 使用示例
 
+#### TUI 交互模式（默认）
+
+MystiSql 默认启动交互式 TUI 界面，提供类似 MySQL 命令行的简洁体验：
+
+```bash
+# 直接运行，启动 TUI 交互界面
+./bin/mystisql
+
+# 指定配置文件启动 TUI
+./bin/mystisql --config config.yaml
+```
+
+**TUI 界面示例**:
+
+```
+Welcome to the MystiSql monitor. Commands end with Enter.
+Your MystiSql connection has 1 instance(s) configured.
+Current instance: local-mysql
+
+Type 'help' or '?' for help. Type 'exit' or Ctrl+C to quit.
+
+mystisql@local-mysql> SELECT * FROM users LIMIT 2;
+id  name    email
+1   Alice   alice@example.com
+2   Bob     bob@example.com
+
+2 rows, 0.005s
+
+mystisql@local-mysql> INSERT INTO users (name, email) VALUES ('Charlie', 'charlie@example.com');
+受影响行数: 1
+最后插入ID: 3
+执行时间: 0.003s
+
+mystisql@local-mysql> _
+```
+
+**TUI 快捷键**:
+
+| 快捷键 | 功能 |
+|--------|------|
+| Enter | 执行 SQL |
+| Tab | 切换数据库实例 |
+| Ctrl+E | 导出结果 |
+| ? | 显示帮助 |
+| Ctrl+C | 退出 |
+| ↑/↓ | 浏览历史命令 |
+
+**TUI 特性**:
+- 响应式布局，自动适配终端尺寸
+- SQL 语法高亮
+- 命令历史记录
+- 实例快速切换
+- 结果格式化显示
+
+#### 直接执行 SQL（query 子命令）
+
+如果不需要交互界面，可以使用 `query` 子命令直接执行 SQL：
+
+```bash
+# 执行 SELECT 查询
+./bin/mystisql query --instance local-mysql "SELECT * FROM users LIMIT 5"
+
+# JSON 格式输出
+./bin/mystisql query --instance local-mysql "SELECT * FROM users LIMIT 5" --format json
+
+# 执行 INSERT
+./bin/mystisql query --instance local-mysql "INSERT INTO users (name, email) VALUES ('Alice', 'alice@example.com')"
+
+# 执行 UPDATE
+./bin/mystisql query --instance local-mysql "UPDATE users SET name='Bob' WHERE id=1"
+
+# 执行 DELETE
+./bin/mystisql query --instance local-mysql "DELETE FROM users WHERE id=1"
+```
+
+输出示例（SELECT 查询）：
+```
+id   name    email
+1    Alice   alice@example.com
+2    Bob     bob@example.com
+
+2 行数据，执行时间: 5ms
+```
+
+输出示例（INSERT/UPDATE/DELETE）：
+```
+受影响行数: 1
+最后插入ID: 123
+执行时间: 3ms
+```
+
 #### 查看版本
 
 ```bash

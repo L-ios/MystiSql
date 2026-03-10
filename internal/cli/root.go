@@ -21,23 +21,21 @@ var (
 	rootCancel context.CancelFunc
 )
 
-// rootCmd 根命令
 var rootCmd = &cobra.Command{
 	Use:   "mystisql",
 	Short: "MystiSql - Kubernetes 数据库访问网关",
 	Long: `MystiSql 是一个数据库访问网关，支持 MySQL、PostgreSQL、Oracle 和 Redis。
 
-它提供了统一的访问接口，包括 CLI、WebUI、RESTful API、WebSocket 和 JDBC 驱动。`,
+它提供了统一的访问接口，包括 CLI、WebUI、RESTful API、WebSocket 和 JDBC 驱动。
+
+默认启动交互式 TUI 界面。使用子命令（如 query、serve）执行其他操作。`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		// 初始化日志
 		if err := InitLogger(verbose); err != nil {
 			return fmt.Errorf("初始化日志失败: %w", err)
 		}
 
-		// 创建上下文
 		rootCtx, rootCancel = context.WithCancel(context.Background())
 
-		// 加载配置
 		var err error
 		if cfgFile != "" {
 			cfg, err = config.LoadFromPath(cfgFile)
@@ -53,10 +51,8 @@ var rootCmd = &cobra.Command{
 			GetSugar().Debug("使用默认配置")
 		}
 
-		// 初始化实例注册中心
 		registry = discovery.NewRegistry()
 
-		// 如果配置了静态实例，加载到注册中心
 		if len(cfg.Instances) > 0 {
 			discoverer := static.NewDiscoverer(cfg.Instances)
 			instances, err := discoverer.Discover(rootCtx)
@@ -75,42 +71,39 @@ var rootCmd = &cobra.Command{
 
 		return nil
 	},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		app := NewTUIApp(GetConfig(), GetRegistry())
+		if err := app.Run(); err != nil {
+			return fmt.Errorf("启动 TUI 界面失败: %w", err)
+		}
+		return nil
+	},
 	PersistentPostRun: func(cmd *cobra.Command, args []string) {
-		// 清理资源
 		if rootCancel != nil {
 			rootCancel()
 		}
-		// 忽略同步标准输出的错误
 		_ = Sync()
 	},
 }
 
-// Execute 执行根命令
 func Execute() error {
 	return rootCmd.Execute()
 }
 
 func init() {
-	// 全局标志
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "配置文件路径")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "详细日志输出")
 	rootCmd.PersistentFlags().StringVar(&tokenFlag, "token", "", "认证 Token")
-
-	// 添加 TUI 命令
-	rootCmd.AddCommand(NewTUICmd())
 }
 
-// GetConfig 获取配置
 func GetConfig() *types.Config {
 	return cfg
 }
 
-// GetRegistry 获取实例注册中心
 func GetRegistry() discovery.InstanceRegistry {
 	return registry
 }
 
-// GetContext 获取根上下文
 func GetContext() context.Context {
 	return rootCtx
 }

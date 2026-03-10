@@ -58,6 +58,85 @@ go mod verify                                    # Verify dependencies
 go get -u ./... && go mod tidy                   # Update dependencies
 ```
 
+## TUI (Terminal User Interface)
+
+MystiSql 默认启动交互式 TUI 界面，提供类似 MySQL 命令行的简洁体验。
+
+### TUI 特性
+
+- **默认启动**: 运行 `mystisql` 无参数时自动启动 TUI
+- **简洁界面**: 类似 MySQL 的命令行风格，无复杂装饰
+- **依赖注入**: TUI 使用配置系统和实例注册中心，无硬编码
+- **响应式布局**: 动态适配不同终端尺寸
+- **多行输入**: 支持多行 SQL 输入
+- **历史命令**: 上下键浏览历史命令
+- **实例切换**: Tab 键切换数据库实例
+- **语法高亮**: SQL 关键字高亮显示
+
+### TUI 界面示例
+
+```
+Welcome to the MystiSql monitor. Commands end with Enter.
+Your MystiSql connection has 1 instance(s) configured.
+Current instance: local-mysql
+
+Type 'help' or '?' for help. Type 'exit' or Ctrl+C to quit.
+
+mystisql@local-mysql> SELECT * FROM users LIMIT 2;
+id  name    email
+1   Alice   alice@example.com
+2   Bob     bob@example.com
+
+2 rows, 0.005s
+
+mystisql@local-mysql> INSERT INTO users (name, email) VALUES ('Charlie', 'charlie@example.com');
+受影响行数: 1
+最后插入ID: 3
+执行时间: 0.003s
+
+mystisql@local-mysql> _
+```
+
+### TUI 快捷键
+
+| 快捷键 | 功能 |
+|--------|------|
+| Enter | 执行 SQL |
+| Tab | 切换实例 |
+| Ctrl+E | 导出结果 |
+| ? | 显示帮助 |
+| Ctrl+C | 退出 |
+| ↑/↓ | 浏览历史命令 / 导航列表 |
+| Esc | 取消当前操作 |
+
+### TUI 开发
+
+TUI 代码位于 `internal/cli/tui.go`，使用 Bubble Tea 框架。
+
+**依赖注入**:
+```go
+// 创建 TUI 应用时传递配置和注册中心
+app := NewTUIApp(cfg, registry)
+app.Run()
+```
+
+**测试**:
+```bash
+# 运行 TUI 单元测试
+go test -v ./internal/cli/... -run TestTUI
+
+# 运行 TUI 集成测试
+go test -v ./internal/cli/... -run "TestTUIWith|TestTUIInstance"
+```
+
+### query 子命令
+
+使用 `query` 子命令直接执行 SQL（不进入 TUI）:
+```bash
+mystisql query --instance local-mysql "SELECT * FROM users"
+mystisql query "SELECT 1"  # 使用默认实例
+```
+
 ## Project Structure
 
 ```

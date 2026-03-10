@@ -301,3 +301,127 @@
 - **WHEN** 引入新的 API 版本
 - **THEN** 旧版本必须保持兼容
 - **AND** 必须支持多版本共存
+
+---
+
+### Requirement: 认证端点
+
+系统必须提供认证相关的端点。
+
+#### Scenario: 生成认证令牌
+
+- **WHEN** 调用 POST /api/v1/auth/token
+- **THEN** 必须生成 JWT 令牌
+- **AND** 请求体必须包含：user_id、role
+- **AND** 响应必须包含：token、expires_at
+- **AND** 必须返回 200 OK 状态
+
+#### Scenario: 撤销认证令牌
+
+- **WHEN** 调用 DELETE /api/v1/auth/token
+- **THEN** 必须将令牌添加到黑名单
+- **AND** 请求体必须包含：token
+- **AND** 必须返回 200 OK 状态
+
+#### Scenario: 列出令牌
+
+- **WHEN** 调用 GET /api/v1/auth/tokens
+- **THEN** 必须返回所有有效令牌
+- **AND** 每个令牌必须包含：user_id、role、expires_at
+- **AND** 必须返回 200 OK 状态
+
+---
+
+### Requirement: 审计日志端点
+
+系统必须提供审计日志查询端点。
+
+#### Scenario: 查询审计日志
+
+- **WHEN** 调用 GET /api/v1/audit/logs
+- **THEN** 必须返回审计日志记录
+- **AND** 支持查询参数：start_time、end_time、instance、user_id
+- **AND** 响应必须包含：timestamp、user_id、instance、sql、execution_time、rows_affected
+- **AND** 必须返回 200 OK 状态
+
+---
+
+### Requirement: 验证器端点
+
+系统必须提供 SQL 验证器配置端点。
+
+#### Scenario: 更新白名单
+
+- **WHEN** 调用 PUT /api/v1/validator/whitelist
+- **THEN** 必须更新 SQL 白名单
+- **AND** 请求体必须包含：rules（规则数组）
+- **AND** 必须返回 200 OK 状态
+
+#### Scenario: 更新黑名单
+
+- **WHEN** 调用 PUT /api/v1/validator/blacklist
+- **THEN** 必须更新 SQL 黑名单
+- **AND** 请求体必须包含：rules（规则数组）
+- **AND** 必须返回 200 OK 状态
+
+---
+
+### Requirement: 事务端点
+
+系统必须提供事务管理端点。
+
+#### Scenario: 开始事务
+
+- **WHEN** 调用 POST /api/v1/transaction/begin
+- **THEN** 必须开始新事务
+- **AND** 请求体必须包含：instance
+- **AND** 响应必须包含：transaction_id
+- **AND** 必须返回 200 OK 状态
+
+#### Scenario: 提交事务
+
+- **WHEN** 调用 POST /api/v1/transaction/commit
+- **THEN** 必须提交指定事务
+- **AND** 请求体必须包含：transaction_id
+- **AND** 必须返回 200 OK 状态
+
+#### Scenario: 回滚事务
+
+- **WHEN** 调用 POST /api/v1/transaction/rollback
+- **THEN** 必须回滚指定事务
+- **AND** 请求体必须包含：transaction_id
+- **AND** 必须返回 200 OK 状态
+
+---
+
+### Requirement: 批量操作端点
+
+系统必须提供批量 SQL 执行端点。
+
+#### Scenario: 执行批量操作
+
+- **WHEN** 调用 POST /api/v1/batch
+- **THEN** 必须执行批量 SQL 语句
+- **AND** 请求体必须包含：instance、queries、stop_on_error
+- **AND** 响应必须包含：results（每个查询的结果）
+- **AND** 必须返回 200 OK 状态
+
+---
+
+### Requirement: WebSocket 端点
+
+系统必须提供 WebSocket 端点用于实时查询执行。
+
+#### Scenario: WebSocket 连接
+
+- **WHEN** 连接到 ws://host:port/ws
+- **THEN** 必须通过 token 参数进行认证
+- **AND** 必须支持实时 SQL 执行
+- **AND** 必须支持心跳机制（ping/pong）
+
+#### Scenario: WebSocket 消息格式
+
+- **WHEN** 通过 WebSocket 发送消息
+- **THEN** 消息必须是 JSON 格式
+- **AND** 必须包含：type、data
+- **AND** 支持的类型：query、ping、pong

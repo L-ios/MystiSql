@@ -66,6 +66,16 @@ type model struct {
 	isExecuting bool
 	// 查询引擎
 	queryEngine *query.Engine
+	// 命令历史
+	history []string
+	// 当前历史索引
+	historyIndex int
+	// 导出格式
+	exportFormat string
+	// 显示导出选项
+	showExportOptions bool
+	// 当前选中的导出格式索引
+	selectedExportFormat int
 }
 
 // Init 初始化模型
@@ -78,6 +88,16 @@ func (m *model) Init() tea.Cmd {
 	m.instances = []string{"local-mysql", "local-postgres", "local-oracle", "local-redis"}
 	// 设置默认选中的实例
 	m.selectedInstance = 0
+	// 初始化命令历史
+	m.history = []string{}
+	// 初始化历史索引
+	m.historyIndex = -1
+	// 初始化导出格式
+	m.exportFormat = "csv"
+	// 初始化导出选项显示
+	m.showExportOptions = false
+	// 初始化选中的导出格式索引
+	m.selectedExportFormat = 0
 	return nil
 }
 
@@ -97,6 +117,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "tab":
 			// 显示/隐藏实例列表
 			m.showInstanceList = !m.showInstanceList
+		case "e":
+			// 显示/隐藏导出选项
+			m.showExportOptions = !m.showExportOptions
 		case "enter":
 			// 处理输入
 			if m.showInstanceList {
@@ -106,12 +129,26 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.results = fmt.Sprintf("已切换到实例: %s", m.instance)
 				}
 				m.showInstanceList = false
+			} else if m.showExportOptions {
+				// 确认选择导出格式
+				exportFormats := []string{"csv", "json", "table"}
+				if m.selectedExportFormat >= 0 && m.selectedExportFormat < len(exportFormats) {
+					m.exportFormat = exportFormats[m.selectedExportFormat]
+					m.results = fmt.Sprintf("已设置导出格式: %s", m.exportFormat)
+				}
+				m.showExportOptions = false
 			} else if m.input != "" {
 				m.isExecuting = true
 				m.errorMsg = ""
 
 				// 执行 SQL
 				sqlQuery := m.input
+
+				// 添加到命令历史
+				m.history = append(m.history, sqlQuery)
+				// 重置历史索引
+				m.historyIndex = -1
+
 				m.input = ""
 
 				// 创建带超时的上下文
@@ -156,12 +193,43 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.selectedInstance > 0 {
 					m.selectedInstance--
 				}
+			} else if m.showExportOptions {
+				// 选择导出格式
+				if m.selectedExportFormat > 0 {
+					m.selectedExportFormat--
+				}
+			} else {
+				// 浏览历史命令
+				if len(m.history) > 0 {
+					if m.historyIndex == -1 {
+						m.historyIndex = len(m.history) - 1
+					} else if m.historyIndex > 0 {
+						m.historyIndex--
+					}
+					m.input = m.history[m.historyIndex]
+				}
 			}
 		case "down":
 			// 下移选择
 			if m.showInstanceList {
 				if m.selectedInstance < len(m.instances)-1 {
 					m.selectedInstance++
+				}
+			} else if m.showExportOptions {
+				// 选择导出格式
+				if m.selectedExportFormat < 2 {
+					m.selectedExportFormat++
+				}
+			} else {
+				// 浏览历史命令
+				if len(m.history) > 0 {
+					if m.historyIndex == len(m.history)-1 {
+						m.historyIndex = -1
+						m.input = ""
+					} else if m.historyIndex >= 0 {
+						m.historyIndex++
+						m.input = m.history[m.historyIndex]
+					}
 				}
 			}
 		case "backspace":
@@ -270,6 +338,12 @@ func formatExecResult(result *types.ExecResult) string {
 	return output.String()
 }
 
+// highlightSQL 高亮 SQL 代码
+func highlightSQL(sql string) string {
+	// 暂时返回原始 SQL，因为 chroma/v2 的终端格式化器路径有问题
+	return sql
+}
+
 // View 渲染视图
 func (m *model) View() string {
 	// 计算各区域高度
@@ -305,11 +379,29 @@ func (m *model) View() string {
 		instanceList = resultsStyle.Render(listContent.String())
 	}
 
+	// 导出选项
+	var exportOptions string
+	if m.showExportOptions {
+		var listContent strings.Builder
+		exportFormats := []string{"csv", "json", "table"}
+		listContent.WriteString("导出格式:\n")
+		for i, format := range exportFormats {
+			if i == m.selectedExportFormat {
+				listContent.WriteString(fmt.Sprintf("→ %s\n", format))
+			} else {
+				listContent.WriteString(fmt.Sprintf("  %s\n", format))
+			}
+		}
+		listContent.WriteString("\n按 Enter 选择，按 Esc 取消")
+		exportOptions = resultsStyle.Render(listContent.String())
+	}
+
 	// 输入区域
-	input := inputStyle.Render(fmt.Sprintf("SQL> %s", m.input))
+	highlightedInput := highlightSQL(m.input)
+	input := inputStyle.Render(fmt.Sprintf("SQL> %s", highlightedInput))
 
 	// 底部状态栏
-	bottomBar := bottomBarStyle.Render("按 Enter 执行 SQL | 按 Tab 切换实例 | 按 Ctrl+C 退出")
+	bottomBar := bottomBarStyle.Render("按 Enter 执行 SQL | 按 Tab 切换实例 | 按 e 导出结果 | 按 Ctrl+C 退出")
 
 	// 组合所有区域
 	var mainContent string
@@ -317,6 +409,12 @@ func (m *model) View() string {
 		mainContent = lipgloss.JoinVertical(
 			lipgloss.Top,
 			instanceList,
+			input,
+		)
+	} else if m.showExportOptions {
+		mainContent = lipgloss.JoinVertical(
+			lipgloss.Top,
+			exportOptions,
 			input,
 		)
 	} else {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 type Formatter struct{}
@@ -43,14 +44,15 @@ func (f *Formatter) calculateColumnWidths(result *types.QueryResult) []int {
 	widths := make([]int, len(result.Columns))
 
 	for i, col := range result.Columns {
-		widths[i] = len(col.Name)
+		widths[i] = utf8.RuneCountInString(col.Name)
 	}
 
 	for _, row := range result.Rows {
 		for i, val := range row {
 			str := f.formatValue(val)
-			if len(str) > widths[i] {
-				widths[i] = len(str)
+			runeLen := utf8.RuneCountInString(str)
+			if runeLen > widths[i] {
+				widths[i] = runeLen
 			}
 		}
 	}
@@ -115,17 +117,19 @@ func (f *Formatter) isNumeric(val interface{}) bool {
 }
 
 func (f *Formatter) padRight(s string, width int) string {
-	if len(s) >= width {
+	runeLen := utf8.RuneCountInString(s)
+	if runeLen >= width {
 		return s
 	}
-	return s + strings.Repeat(" ", width-len(s))
+	return s + strings.Repeat(" ", width-runeLen)
 }
 
 func (f *Formatter) padLeft(s string, width int) string {
-	if len(s) >= width {
+	runeLen := utf8.RuneCountInString(s)
+	if runeLen >= width {
 		return s
 	}
-	return strings.Repeat(" ", width-len(s)) + s
+	return strings.Repeat(" ", width-runeLen) + s
 }
 
 func (f *Formatter) FormatVertical(result *types.QueryResult) string {

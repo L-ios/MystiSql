@@ -3,6 +3,7 @@ package repl
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestInputBuffer_IsEmpty(t *testing.T) {
@@ -214,11 +215,11 @@ func TestFormatter_FormatValue(t *testing.T) {
 func TestFormatter_PadRight(t *testing.T) {
 	f := NewFormatter()
 
-	if got := f.padRight("test", 10); len(got) != 10 {
-		t.Errorf("padRight length = %d, want 10", len(got))
+	if got := f.padRight("test", 10); utf8.RuneCountInString(got) != 10 {
+		t.Errorf("padRight rune count = %d, want 10", utf8.RuneCountInString(got))
 	}
-	if got := f.padRight("testtesttest", 5); len(got) != 12 {
-		t.Errorf("padRight length = %d, want 12 (no truncation)", len(got))
+	if got := f.padRight("testtesttest", 5); utf8.RuneCountInString(got) != 12 {
+		t.Errorf("padRight rune count = %d, want 12 (no truncation)", utf8.RuneCountInString(got))
 	}
 }
 

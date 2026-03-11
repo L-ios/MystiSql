@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"MystiSql/internal/cli/repl"
 	"MystiSql/internal/config"
 	"MystiSql/internal/discovery"
 	"MystiSql/internal/discovery/static"
@@ -28,7 +29,7 @@ var rootCmd = &cobra.Command{
 
 它提供了统一的访问接口，包括 CLI、WebUI、RESTful API、WebSocket 和 JDBC 驱动。
 
-默认启动交互式 TUI 界面。使用子命令（如 query、serve）执行其他操作。`,
+默认启动交互式 REPL 界面。使用子命令（如 query、serve）执行其他操作。`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		if err := InitLogger(verbose); err != nil {
 			return fmt.Errorf("初始化日志失败: %w", err)
@@ -72,9 +73,9 @@ var rootCmd = &cobra.Command{
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		app := NewTUIApp(GetConfig(), GetRegistry())
-		if err := app.Run(); err != nil {
-			return fmt.Errorf("启动 TUI 界面失败: %w", err)
+		r := repl.NewREPL(GetConfig(), GetRegistry())
+		if err := r.Run(); err != nil {
+			return fmt.Errorf("REPL error: %w", err)
 		}
 		return nil
 	},

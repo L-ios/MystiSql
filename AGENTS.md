@@ -109,15 +109,67 @@ mystisql@local-mysql> _
 | ↑/↓ | 浏览历史命令 / 导航列表 |
 | Esc | 取消当前操作 |
 
-### TUI 开发
+### REPL 交互界面
 
-TUI 代码位于 `internal/cli/tui.go`，使用 Bubble Tea 框架。
+MystiSql 默认启动 MySQL 鈄式的 REPL (Read-Eval-Print-Loop) 交互界面，使用 `golang.org/x/term` 实现终端原始模式。
 
+**REPL 文** (`internal/cli/repl/`)：
+```
+repl.go        # REPL 核心引擎
+input.go      # 多行输入处理
+formatter.go  # 输出格式化
+commands.go  # 内置命令
+history.go    # 历史管理
+readline.go  # ReadLine 支持
+```
+
+**快捷键**:
+| 快捷键 | 功能 |
+|--------|------|
+| Enter | 执行 SQL 或命令 |
+| Tab | 自动补全（未来功能） |
+| Ctrl+C | 中断当前输入/退出 |
+| ↑/↓ | 浏览历史命令 |
+| Esc | 取消当前操作 |
+| Ctrl+D | 删除字符 |
+| Ctrl+A | 移动到行首 |
+| Ctrl+E | 移动到行尾 |
+
+| Ctrl+U | 删除到行尾 |
+| Ctrl+K | 删除整行 |
+
+**提示符**:
+- 新语句: `mystisql@instance>`
+- 续行: `    ->`、`    '>`、`    ">`、`    `>`（反引号）
+- 注释后: `    -- `或 `#`
+
+**内置命令**:
+| 命令 | 稡格式 | 描述 |
+|------|---------|------|
+| `exit`, `quit`, `\q` | 退出 REPL | exit |
+| `help`, `?`, `\h` | 显示帮助 | clear, `\c` | 清除当前输入 | status, `\s` | 显示状态 | print, `\p` | 打印当前输入 | edit, `\e` | 编辑当前输入 ($EDITOR) | ego, `\G` | 埥询并垂直显示结果 | go, `\g` | 执行查询 | use, `instance` | 切换实例 | prompt, `\R` | 自定义提示符 | source, `\.` | 执行脚本文件 | system, `\!` | 执行系统命令 | output, `\o` | 设置输出格式 (csv, json) |
+
+**输出格式**:
+- 表格格式（默认): ASCII 表格，对齐
+- 尴直格式 (`\G`): 每行一列显示
+- CSV 格式 (`\o csv`)
+- JSON 格式 (`\o json`)
+**历史命令**:
+- 匁存在 `~/.mystisql/history`
+- 上下箭头浏览历史
+- 匁久去重
+**开发**:
+REPL 代码位于 `internal/cli/repl/`，使用 `golang.org/x/term` 庄。
 **依赖注入**:
 ```go
-// 创建 TUI 应用时传递配置和注册中心
-app := NewTUIApp(cfg, registry)
+// 创建 REPL 应用时传递配置和注册中心
+app := NewREPL(cfg, registry)
 app.Run()
+```
+**测试**:
+```bash
+# 运行 REPL 单元测试
+go test -v ./internal/cli/repl/...
 ```
 
 **测试**:

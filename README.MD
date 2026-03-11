@@ -1179,59 +1179,83 @@ instances:
 
 ### CLI 使用示例
 
-#### TUI 交互模式（默认）
+#### REPL 交互模式（默认）
 
-MystiSql 默认启动交互式 TUI 界面，提供类似 MySQL 命令行的简洁体验：
+MystiSql 默认启动 MySQL 风格的 REPL (Read-Eval-Print-Loop) 交互界面，提供与 MySQL 命令行客户端高度相似的体验：
 
 ```bash
-# 直接运行，启动 TUI 交互界面
+# 直接运行，启动 REPL 交互界面
 ./bin/mystisql
 
-# 指定配置文件启动 TUI
+# 指定配置文件启动 REPL
 ./bin/mystisql --config config.yaml
 ```
 
-**TUI 界面示例**:
+**REPL 界面示例**:
 
 ```
-Welcome to the MystiSql monitor. Commands end with Enter.
+Welcome to the MystiSql monitor. Commands end with ; or \g.
 Your MystiSql connection has 1 instance(s) configured.
 Current instance: local-mysql
 
-Type 'help' or '?' for help. Type 'exit' or Ctrl+C to quit.
+Type 'help' or '\h' for help. Type '\c' to clear current input statement.
 
 mystisql@local-mysql> SELECT * FROM users LIMIT 2;
-id  name    email
-1   Alice   alice@example.com
-2   Bob     bob@example.com
-
-2 rows, 0.005s
++----+-------+-------------------+
+| id | name  | email             |
++----+-------+-------------------+
+|  1 | Alice | alice@example.com |
+|  2 | Bob   | bob@example.com   |
++----+-------+-------------------+
+2 row(s) in set (0.005 sec)
 
 mystisql@local-mysql> INSERT INTO users (name, email) VALUES ('Charlie', 'charlie@example.com');
-受影响行数: 1
-最后插入ID: 3
-执行时间: 0.003s
+Query OK, 1 row(s) affected (0.003 sec)
+Last insert ID: 3
 
 mystisql@local-mysql> _
 ```
 
-**TUI 快捷键**:
+**REPL 快捷键**:
 
 | 快捷键 | 功能 |
 |--------|------|
-| Enter | 执行 SQL |
-| Tab | 切换数据库实例 |
-| Ctrl+E | 导出结果 |
-| ? | 显示帮助 |
-| Ctrl+C | 退出 |
+| Enter | 执行 SQL 或命令 |
 | ↑/↓ | 浏览历史命令 |
+| Ctrl+C | 中断当前输入/退出 |
+| Ctrl+D | 删除字符 |
+| Ctrl+A | 移动到行首 |
+| Ctrl+E | 移动到行尾 |
 
-**TUI 特性**:
-- 响应式布局，自动适配终端尺寸
-- SQL 语法高亮
-- 命令历史记录
-- 实例快速切换
-- 结果格式化显示
+**REPL 内置命令**:
+
+| 命令 | 短格式 | 描述 |
+|------|--------|------|
+| exit, quit | \q | 退出 REPL |
+| help | \h, ? | 显示帮助 |
+| clear | \c | 清除当前输入 |
+| status | \s | 显示状态 |
+| print | \p | 打印当前输入 |
+| edit | \e | 编辑当前输入 ($EDITOR) |
+| use | | 切换实例 (USE <instance>) |
+| prompt | \R | 自定义提示符 |
+| source | \. | 执行脚本文件 |
+| system | \! | 执行系统命令 |
+| output | \o | 设置输出格式 (csv, json) |
+
+**REPL 输出格式**:
+
+- 表格格式（默认）: ASCII 表格，自动对齐
+- 垂直格式 (`\G`): 每行一列显示
+- CSV 格式 (`\o csv`)
+- JSON 格式 (`\o json`)
+
+**REPL 特性**:
+- 多行 SQL 输入（以 `;` 或 `\g` 结尾）
+- 续行提示符（`->`, `'>`, `">`, `` `> ``）
+- 命令历史（存储在 `~/.mystisql/history`）
+- 上下箭头浏览历史
+- 历史去重和持久化
 
 #### 直接执行 SQL（query 子命令）
 

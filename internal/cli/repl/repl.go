@@ -123,7 +123,7 @@ func (r *REPL) mainLoop() error {
 				fmt.Println("Bye")
 				return nil
 			}
-			fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
+			fmt.Fprintf(os.Stderr, "ERROR: %v\r\n", err)
 		}
 	}
 	return nil

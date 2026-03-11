@@ -51,11 +51,11 @@ func (rl *ReadLine) ReadLine(prompt string) (string, error) {
 
 		switch ch[0] {
 		case 3:
-			fmt.Fprintln(rl.terminal.writer, "^C")
+			fmt.Fprintln(rl.terminal.writer, "^C\r")
 			return "", nil
 
 		case 13, 10:
-			fmt.Fprintln(rl.terminal.writer)
+			fmt.Fprintln(rl.terminal.writer, "\r")
 			return string(line), nil
 
 		case 127, 8:

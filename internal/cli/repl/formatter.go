@@ -18,7 +18,7 @@ func NewFormatter() *Formatter {
 
 func (f *Formatter) FormatTable(result *types.QueryResult) string {
 	if len(result.Columns) == 0 {
-		return "Empty set\n"
+		return "Empty set\r\n"
 	}
 
 	colWidths := f.calculateColumnWidths(result)
@@ -35,7 +35,7 @@ func (f *Formatter) FormatTable(result *types.QueryResult) string {
 
 	f.writeSeparator(&output, colWidths)
 
-	output.WriteString(fmt.Sprintf("%d row(s) in set (%.3f sec)\n\n", result.RowCount, result.ExecutionTime.Seconds()))
+	output.WriteString(fmt.Sprintf("%d row(s) in set (%.3f sec)\r\n\r\n", result.RowCount, result.ExecutionTime.Seconds()))
 
 	return output.String()
 }
@@ -66,7 +66,7 @@ func (f *Formatter) writeSeparator(output *strings.Builder, widths []int) {
 		output.WriteString(strings.Repeat("-", w+2))
 		output.WriteString("+")
 	}
-	output.WriteString("\n")
+	output.WriteString("\r\n")
 }
 
 func (f *Formatter) writeHeader(output *strings.Builder, columns []types.ColumnInfo, widths []int) {
@@ -76,7 +76,7 @@ func (f *Formatter) writeHeader(output *strings.Builder, columns []types.ColumnI
 		output.WriteString(f.padRight(col.Name, widths[i]))
 		output.WriteString(" |")
 	}
-	output.WriteString("\n")
+	output.WriteString("\r\n")
 }
 
 func (f *Formatter) writeRow(output *strings.Builder, row []interface{}, widths []int) {
@@ -91,7 +91,7 @@ func (f *Formatter) writeRow(output *strings.Builder, row []interface{}, widths 
 		}
 		output.WriteString(" |")
 	}
-	output.WriteString("\n")
+	output.WriteString("\r\n")
 }
 
 func (f *Formatter) formatValue(val interface{}) string {
@@ -134,20 +134,20 @@ func (f *Formatter) padLeft(s string, width int) string {
 
 func (f *Formatter) FormatVertical(result *types.QueryResult) string {
 	if len(result.Columns) == 0 {
-		return "Empty set\n"
+		return "Empty set\r\n"
 	}
 
 	var output strings.Builder
 
 	for rowIdx, row := range result.Rows {
-		output.WriteString(fmt.Sprintf("*************************** %d. row ***************************\n", rowIdx+1))
+		output.WriteString(fmt.Sprintf("*************************** %d. row ***************************\r\n", rowIdx+1))
 		for i, col := range result.Columns {
 			value := f.formatValue(row[i])
-			output.WriteString(fmt.Sprintf("%s: %s\n", col.Name, value))
+			output.WriteString(fmt.Sprintf("%s: %s\r\n", col.Name, value))
 		}
 	}
 
-	output.WriteString(fmt.Sprintf("\n%d row(s) in set (%.3f sec)\n\n", result.RowCount, result.ExecutionTime.Seconds()))
+	output.WriteString(fmt.Sprintf("\r\n%d row(s) in set (%.3f sec)\r\n\r\n", result.RowCount, result.ExecutionTime.Seconds()))
 
 	return output.String()
 }
@@ -184,7 +184,7 @@ func (f *Formatter) FormatCSV(result *types.QueryResult) string {
 
 func (f *Formatter) FormatJSON(result *types.QueryResult) string {
 	if len(result.Columns) == 0 {
-		return "[]\n"
+		return "[]\r\n"
 	}
 
 	rows := make([]map[string]interface{}, len(result.Rows))
@@ -198,18 +198,18 @@ func (f *Formatter) FormatJSON(result *types.QueryResult) string {
 
 	data, err := json.MarshalIndent(rows, "", "  ")
 	if err != nil {
-		return fmt.Sprintf("Error formatting JSON: %v\n", err)
+		return fmt.Sprintf("Error formatting JSON: %v\r\n", err)
 	}
 
-	return string(data) + "\n"
+	return string(data) + "\r\n"
 }
 
 func (f *Formatter) FormatError(err error) string {
-	return fmt.Sprintf("ERROR: %v\n", err)
+	return fmt.Sprintf("ERROR: %v\r\n", err)
 }
 
 func (f *Formatter) FormatEmpty() string {
-	return "Empty set\n"
+	return "Empty set\r\n"
 }
 
 func (f *Formatter) ClearScreen() {
@@ -219,26 +219,26 @@ func (f *Formatter) ClearScreen() {
 func (f *Formatter) FormatStatus(r *REPL) string {
 	var output strings.Builder
 
-	output.WriteString("--------------\n")
-	output.WriteString("MystiSql Status\n")
-	output.WriteString("--------------\n")
-	output.WriteString(fmt.Sprintf("Current instance: %s\n", r.currentInstance))
-	output.WriteString(fmt.Sprintf("Total instances: %d\n", len(r.instances)))
+	output.WriteString("--------------\r\n")
+	output.WriteString("MystiSql Status\r\n")
+	output.WriteString("--------------\r\n")
+	output.WriteString(fmt.Sprintf("Current instance: %s\r\n", r.currentInstance))
+	output.WriteString(fmt.Sprintf("Total instances: %d\r\n", len(r.instances)))
 
 	if len(r.instances) > 0 {
-		output.WriteString("Available instances:\n")
+		output.WriteString("Available instances:\r\n")
 		for _, inst := range r.instances {
 			marker := " "
 			if inst.Name == r.currentInstance {
 				marker = "*"
 			}
-			output.WriteString(fmt.Sprintf("  %s %s (%s)\n", marker, inst.Name, inst.Type))
+			output.WriteString(fmt.Sprintf("  %s %s (%s)\r\n", marker, inst.Name, inst.Type))
 		}
 	}
 
-	output.WriteString(fmt.Sprintf("Prompt: %s\n", r.prompt))
-	output.WriteString(fmt.Sprintf("History entries: %d\n", r.history.Count()))
-	output.WriteString("--------------\n")
+	output.WriteString(fmt.Sprintf("Prompt: %s\r\n", r.prompt))
+	output.WriteString(fmt.Sprintf("History entries: %d\r\n", r.history.Count()))
+	output.WriteString("--------------\r\n")
 
 	return output.String()
 }

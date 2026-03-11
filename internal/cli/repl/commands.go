@@ -147,7 +147,7 @@ func (p *CommandParser) ExecuteCommand(cmd *Command) error {
 	case "prompt":
 		if cmd.Args == "" {
 			p.repl.SetPrompt("mystisql@%i> ")
-			fmt.Println("Returning to default PROMPT of mystisql@%i>")
+			fmt.Print("Returning to default PROMPT of mystisql@%i>\r\n")
 		} else {
 			p.repl.SetPrompt(cmd.Args)
 		}
@@ -193,7 +193,7 @@ use       (\u) Use another database instance. Takes instance name as argument.
 
 For server side help, type 'help contents'
 `
-	fmt.Print(help)
+	fmt.Print(strings.ReplaceAll(help, "\n", "\r\n"))
 }
 
 func (p *CommandParser) editInput() error {
@@ -236,6 +236,12 @@ func (p *CommandParser) editInput() error {
 		}
 	}
 
+	// 回显编辑后的内容
+	if !p.repl.inputBuffer.IsEmpty() {
+		fmt.Print("Edit result:\r\n")
+		fmt.Print(p.repl.inputBuffer.GetSQL() + "\r\n")
+	}
+
 	return nil
 }
 
@@ -270,7 +276,7 @@ func (p *CommandParser) sourceFile(filename string) error {
 				if err == ErrExit {
 					return err
 				}
-				fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
+				fmt.Fprintf(os.Stderr, "ERROR: %v\r\n", err)
 			}
 			continue
 		}
@@ -278,7 +284,7 @@ func (p *CommandParser) sourceFile(filename string) error {
 		p.repl.inputBuffer.Append(line)
 		if p.repl.inputBuffer.IsComplete() {
 			if err := p.repl.executeCurrentStatement(); err != nil {
-				fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
+				fmt.Fprintf(os.Stderr, "ERROR: %v\r\n", err)
 			}
 		}
 	}
@@ -303,7 +309,7 @@ func (p *CommandParser) setOutput(format string) error {
 	if format == "" {
 		p.repl.outputMode = OutputNormal
 		p.repl.exportFormat = ""
-		fmt.Println("Output format reset to normal")
+		fmt.Print("Output format reset to normal\r\n")
 		return nil
 	}
 
@@ -312,11 +318,11 @@ func (p *CommandParser) setOutput(format string) error {
 	case "csv":
 		p.repl.outputMode = OutputExport
 		p.repl.exportFormat = "csv"
-		fmt.Println("Output format set to CSV")
+		fmt.Print("Output format set to CSV\r\n")
 	case "json":
 		p.repl.outputMode = OutputExport
 		p.repl.exportFormat = "json"
-		fmt.Println("Output format set to JSON")
+		fmt.Print("Output format set to JSON\r\n")
 	default:
 		return fmt.Errorf("unknown output format: %s (supported: csv, json)", format)
 	}

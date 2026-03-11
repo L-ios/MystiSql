@@ -115,12 +115,12 @@ func (r *REPL) mainLoop() error {
 		prompt := r.getPrompt()
 		line, err := r.readline.ReadLine(prompt)
 		if err != nil {
-			fmt.Println("Bye")
+			fmt.Print("Bye\r\n")
 			return nil
 		}
 		if err := r.processLine(line); err != nil {
 			if err == ErrExit {
-				fmt.Println("Bye")
+				fmt.Print("Bye\r\n")
 				return nil
 			}
 			fmt.Fprintf(os.Stderr, "ERROR: %v\r\n", err)
@@ -207,11 +207,11 @@ func (r *REPL) formatOutput(result *types.QueryResult) {
 }
 
 func (r *REPL) formatExecOutput(result *types.ExecResult) {
-	fmt.Printf("Query OK, %d row(s) affected (%.3f sec)\n", result.RowsAffected, result.ExecutionTime.Seconds())
+	fmt.Printf("Query OK, %d row(s) affected (%.3f sec)\r\n", result.RowsAffected, result.ExecutionTime.Seconds())
 	if result.LastInsertID > 0 {
-		fmt.Printf("Last insert ID: %d\n", result.LastInsertID)
+		fmt.Printf("Last insert ID: %d\r\n", result.LastInsertID)
 	}
-	fmt.Println()
+	fmt.Print("\r\n")
 }
 
 func (r *REPL) exportResult(result *types.QueryResult) {
@@ -229,7 +229,7 @@ func (r *REPL) SetInstance(name string) error {
 	for _, inst := range r.instances {
 		if inst.Name == name {
 			r.currentInstance = name
-			fmt.Printf("Database changed to %s\n", name)
+			fmt.Printf("Database changed to %s\r\n", name)
 			return nil
 		}
 	}
@@ -242,7 +242,7 @@ func (r *REPL) ListInstances() []*types.DatabaseInstance { return r.instances }
 
 func (r *REPL) SetPrompt(template string) {
 	r.prompt = template
-	fmt.Printf("PROMPT set to '%s'\n", template)
+	fmt.Printf("PROMPT set to '%s'\r\n", template)
 }
 
 func (r *REPL) GetPrompt() string { return r.prompt }
@@ -251,21 +251,21 @@ func (r *REPL) SetOutputMode(mode OutputMode, format string) {
 	r.outputMode = mode
 	r.exportFormat = format
 	if format != "" {
-		fmt.Printf("Output format set to %s\n", format)
+		fmt.Printf("Output format set to %s\r\n", format)
 	}
 }
 
 func (r *REPL) CancelInput() {
 	r.inputBuffer.Reset()
-	fmt.Println()
+	fmt.Print("\r\n")
 }
 
 func (r *REPL) PrintCurrentInput() {
 	sql := r.inputBuffer.GetSQL()
 	if sql == "" {
-		fmt.Println("(no input)")
+		fmt.Print("(no input)\r\n")
 	} else {
-		fmt.Println(sql)
+		fmt.Printf("%s\r\n", sql)
 	}
 }
 

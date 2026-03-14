@@ -48,6 +48,13 @@ func (h *BatchHandlers) ExecuteBatch(c *gin.Context) {
 		return
 	}
 
+	if len(req.Queries) > 1000 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Batch size exceeds maximum limit of 1000 queries",
+		})
+		return
+	}
+
 	timeout := 5 * time.Minute
 	ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
 	defer cancel()

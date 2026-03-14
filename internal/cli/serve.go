@@ -9,7 +9,10 @@ import (
 	"time"
 
 	"MystiSql/internal/api/rest"
+	"MystiSql/internal/service/audit"
+	"MystiSql/internal/service/auth"
 	"MystiSql/internal/service/query"
+	"MystiSql/internal/service/validator"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -51,8 +54,51 @@ var serveCmd = &cobra.Command{
 		// 创建 query engine
 		engine := query.NewEngine(GetRegistry())
 
-		// 创建并初始化 API 服务器（authService 暂时为 nil）
-		server := rest.NewServer(&cfg.Server, GetRegistry(), engine, nil, logger, Version)
+		// 创建 auth service (如果启用)
+		var authService *auth.AuthService
+		if cfg.Auth.Enabled && cfg.Auth.Token.Secret != "" {
+			tokenDuration := 24 * time.Hour
+			if cfg.Auth.Token.Expire != "" {
+				if d, err := time.ParseDuration(cfg.Auth.Token.Expire); err == nil {
+					tokenDuration = d
+				}
+			}
+			var err error
+			authService, err = auth.NewAuthService(cfg.Auth.Token.Secret, tokenDuration)
+			if err != nil {
+				return fmt.Errorf("初始化认证服务失败: %w", err)
+			}
+			GetSugar().Info("认证服务已启用")
+		}
+
+		// 创建 validator service (如果启用)
+		var validatorService *validator.ValidatorService
+		if cfg.Validator.Enabled {
+			validatorService = validator.NewValidatorService(logger)
+			GetSugar().Info("SQL 验证器服务已启用")
+		}
+
+		// 创建 audit service (如果启用)
+		var auditService *audit.AuditService
+		var auditLogFile string
+		if cfg.Audit.Enabled {
+			auditConfig := &audit.AuditConfig{
+				Enabled:       cfg.Audit.Enabled,
+				LogFile:       cfg.Audit.LogFile,
+				RetentionDays: cfg.Audit.RetentionDays,
+				BufferSize:    1000,
+			}
+			var err error
+			auditService, err = audit.NewAuditService(auditConfig, logger)
+			if err != nil {
+				return fmt.Errorf("初始化审计服务失败: %w", err)
+			}
+			auditLogFile = cfg.Audit.LogFile
+			GetSugar().Info("审计服务已启用")
+		}
+
+		// 创建并初始化 API 服务器
+		server := rest.NewServer(&cfg.Server, GetRegistry(), engine, authService, validatorService, auditService, auditLogFile, logger, Version)
 		if err := server.Setup(); err != nil {
 			return fmt.Errorf("初始化服务器失败: %w", err)
 		}

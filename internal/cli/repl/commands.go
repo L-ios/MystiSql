@@ -229,7 +229,7 @@ func (p *CommandParser) editInput() error {
 	}
 
 	p.repl.inputBuffer.Reset()
-	lines := strings.Split(string(editedContent), "\n")
+	lines := strings.Split(string(editedContent), "\r\n")
 	for _, line := range lines {
 		if strings.TrimSpace(line) != "" || len(lines) == 1 {
 			p.repl.inputBuffer.Append(line)

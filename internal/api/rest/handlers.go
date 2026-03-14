@@ -9,6 +9,7 @@ import (
 	"MystiSql/internal/discovery"
 	"MystiSql/internal/service/query"
 	"MystiSql/internal/service/transaction"
+	"MystiSql/internal/service/validator"
 	"MystiSql/pkg/types"
 
 	"github.com/gin-gonic/gin"
@@ -17,20 +18,22 @@ import (
 
 // Handlers API 处理器
 type Handlers struct {
-	registry  discovery.InstanceRegistry
-	engine    *query.Engine
-	txManager *transaction.TransactionManager
-	logger    *zap.Logger
-	version   string
+	registry         discovery.InstanceRegistry
+	engine           *query.Engine
+	txManager        *transaction.TransactionManager
+	validatorService *validator.ValidatorService
+	logger           *zap.Logger
+	version          string
 }
 
 // NewHandlers 创建新的处理器
-func NewHandlers(registry discovery.InstanceRegistry, engine *query.Engine, logger *zap.Logger, version string) *Handlers {
+func NewHandlers(registry discovery.InstanceRegistry, engine *query.Engine, validatorService *validator.ValidatorService, logger *zap.Logger, version string) *Handlers {
 	return &Handlers{
-		registry: registry,
-		engine:   engine,
-		logger:   logger,
-		version:  version,
+		registry:         registry,
+		engine:           engine,
+		validatorService: validatorService,
+		logger:           logger,
+		version:          version,
 	}
 }
 
@@ -170,6 +173,33 @@ func (h *Handlers) Query(c *gin.Context) {
 		return
 	}
 
+	// SQL 验证（如果启用）
+	if h.validatorService != nil {
+		validationResult, err := h.validatorService.Validate(c.Request.Context(), req.Instance, req.SQL)
+		if err != nil {
+			h.logger.Error("SQL validation failed",
+				zap.String("instance", req.Instance),
+				zap.Error(err),
+			)
+			c.JSON(http.StatusInternalServerError, NewErrorResponse(
+				"VALIDATION_ERROR",
+				fmt.Sprintf("SQL validation error: %v", err),
+			))
+			return
+		}
+		if !validationResult.Allowed {
+			h.logger.Warn("SQL blocked by validator",
+				zap.String("instance", req.Instance),
+				zap.String("reason", validationResult.Reason),
+			)
+			c.JSON(http.StatusForbidden, NewErrorResponse(
+				"SQL_BLOCKED",
+				validationResult.Reason,
+			))
+			return
+		}
+	}
+
 	// 设置超时
 	timeout := 30 * time.Second // 默认 30 秒
 	if req.Timeout > 0 {
@@ -247,6 +277,33 @@ func (h *Handlers) Exec(c *gin.Context) {
 			fmt.Sprintf("Invalid request: %v", err),
 		))
 		return
+	}
+
+	// SQL 验证（如果启用）
+	if h.validatorService != nil {
+		validationResult, err := h.validatorService.Validate(c.Request.Context(), req.Instance, req.SQL)
+		if err != nil {
+			h.logger.Error("SQL validation failed",
+				zap.String("instance", req.Instance),
+				zap.Error(err),
+			)
+			c.JSON(http.StatusInternalServerError, NewErrorResponse(
+				"VALIDATION_ERROR",
+				fmt.Sprintf("SQL validation error: %v", err),
+			))
+			return
+		}
+		if !validationResult.Allowed {
+			h.logger.Warn("SQL blocked by validator",
+				zap.String("instance", req.Instance),
+				zap.String("reason", validationResult.Reason),
+			)
+			c.JSON(http.StatusForbidden, NewErrorResponse(
+				"SQL_BLOCKED",
+				validationResult.Reason,
+			))
+			return
+		}
 	}
 
 	// 设置超时

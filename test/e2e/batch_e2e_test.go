@@ -20,7 +20,7 @@ func TestE2EBatch_Insert(t *testing.T) {
 	t.Run("setup - get auth token", func(t *testing.T) {
 		resp, err := client.Post("/api/v1/auth/token", map[string]string{
 			"user_id": "batch-test-user",
-			"role":     "admin",
+			"role":    "admin",
 		})
 		require.NoError(t, err)
 		defer resp.Body.Close()
@@ -50,9 +50,9 @@ func TestE2EBatch_Insert(t *testing.T) {
 		resp, err := client.Post("/api/v1/batch", map[string]interface{}{
 			"instance": instance,
 			"queries": []string{
-				"INSERT INTO users (username, email) VALUES ('batch_test_1', 'batch1@test.com')",
-				"INSERT INTO users (username, email) VALUES ('batch_test_2', 'batch2@test.com')",
-				"INSERT INTO users (username, email) VALUES ('batch_test_3', 'batch3@test.com')",
+				"INSERT INTO users (username, email, password_hash) VALUES ('batch_test_1', 'batch1@test.com', 'hash1')",
+				"INSERT INTO users (username, email, password_hash) VALUES ('batch_test_2', 'batch2@test.com', 'hash2')",
+				"INSERT INTO users (username, email, password_hash) VALUES ('batch_test_3', 'batch3@test.com', 'hash3')",
 			},
 			"stopOnError": false,
 		})
@@ -82,7 +82,7 @@ func TestE2EBatch_MixedOperations(t *testing.T) {
 	t.Run("setup - get auth token", func(t *testing.T) {
 		resp, err := client.Post("/api/v1/auth/token", map[string]string{
 			"user_id": "batch-mixed-user",
-			"role":     "admin",
+			"role":    "admin",
 		})
 		require.NoError(t, err)
 		defer resp.Body.Close()
@@ -112,8 +112,8 @@ func TestE2EBatch_MixedOperations(t *testing.T) {
 		resp, err := client.Post("/api/v1/batch", map[string]interface{}{
 			"instance": instance,
 			"queries": []string{
-				"INSERT INTO users (username, email) VALUES ('batch_mixed_1', 'mixed1@test.com')",
-				"INSERT INTO users (username, email) VALUES ('batch_mixed_2', 'mixed2@test.com')",
+				"INSERT INTO users (username, email, password_hash) VALUES ('batch_mixed_1', 'mixed1@test.com', 'hash1')",
+				"INSERT INTO users (username, email, password_hash) VALUES ('batch_mixed_2', 'mixed2@test.com', 'hash2')",
 				"UPDATE users SET email = 'updated@test.com' WHERE username = 'batch_mixed_1'",
 				"DELETE FROM users WHERE username = 'batch_mixed_2'",
 			},
@@ -139,7 +139,7 @@ func TestE2EBatch_WithTransaction(t *testing.T) {
 	t.Run("setup - get auth token", func(t *testing.T) {
 		resp, err := client.Post("/api/v1/auth/token", map[string]string{
 			"user_id": "batch-tx-user",
-			"role":     "admin",
+			"role":    "admin",
 		})
 		require.NoError(t, err)
 		defer resp.Body.Close()
@@ -168,7 +168,7 @@ func TestE2EBatch_WithTransaction(t *testing.T) {
 	t.Run("batch with transaction", func(t *testing.T) {
 		resp, err := client.Post("/api/v1/batch", map[string]interface{}{
 			"instance":       instance,
-			"queries":        []string{"INSERT INTO users (username, email) VALUES ('batch_tx_1', 'tx1@test.com')"},
+			"queries":        []string{"INSERT INTO users (username, email, password_hash) VALUES ('batch_tx_1', 'tx1@test.com', 'hash1')"},
 			"useTransaction": true,
 		})
 		require.NoError(t, err)
@@ -191,7 +191,7 @@ func TestE2EBatch_SizeLimit(t *testing.T) {
 	t.Run("setup - get auth token", func(t *testing.T) {
 		resp, err := client.Post("/api/v1/auth/token", map[string]string{
 			"user_id": "batch-limit-user",
-			"role":     "admin",
+			"role":    "admin",
 		})
 		require.NoError(t, err)
 		defer resp.Body.Close()

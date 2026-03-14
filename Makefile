@@ -1,19 +1,51 @@
-.PHONY: all build test test-coverage lint fmt vet clean e2e-setup e2e-test e2e-teardown e2e-reset e2e-check help
+.PHONY: all build test test-coverage lint fmt vet clean e2e-setup e2e-test e2e-teardown e2e-reset e2e-check help release build-linux build-darwin build-windows
 
 BINARY_NAME=mystisql
 MAIN_PATH=./cmd/mystisql
 TEST_TIMEOUT=5m
 E2E_TEST_TIMEOUT=10m
+VERSION?=v0.3.0
+BUILD_TIME=$(shell date -u '+%Y-%m-%d_%H:%M:%S')
+GIT_COMMIT=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+LDFLAGS=-ldflags "-X main.version=$(VERSION) -X main.date=$(BUILD_TIME) -X main.commit=$(GIT_COMMIT)"
 
 all: build
 
 build:
 	@echo "Building $(BINARY_NAME)..."
-	@go build -o bin/$(BINARY_NAME) $(MAIN_PATH)
+	@go build $(LDFLAGS) -o bin/$(BINARY_NAME) $(MAIN_PATH)
+
+release:
+	@echo "Building release binaries for $(VERSION)..."
+	@mkdir -p bin/dist
+	@echo "Building Linux AMD64..."
+	@GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o bin/dist/$(BINARY_NAME)-$(VERSION)-linux-amd64 $(MAIN_PATH)
+	@echo "Building Linux ARM64..."
+	@GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o bin/dist/$(BINARY_NAME)-$(VERSION)-linux-arm64 $(MAIN_PATH)
+	@echo "Building macOS AMD64..."
+	@GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o bin/dist/$(BINARY_NAME)-$(VERSION)-darwin-amd64 $(MAIN_PATH)
+	@echo "Building macOS ARM64..."
+	@GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o bin/dist/$(BINARY_NAME)-$(VERSION)-darwin-arm64 $(MAIN_PATH)
+	@echo "Building Windows AMD64..."
+	@GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o bin/dist/$(BINARY_NAME)-$(VERSION)-windows-amd64.exe $(MAIN_PATH)
+	@echo "Building Windows ARM64..."
+	@GOOS=windows GOARCH=arm64 go build $(LDFLAGS) -o bin/dist/$(BINARY_NAME)-$(VERSION)-windows-arm64.exe $(MAIN_PATH)
+	@echo "Creating checksums..."
+	@cd bin/dist && sha256sum * > checksums.txt
+	@echo "Release binaries created in bin/dist/"
 
 build-linux:
 	@echo "Building $(BINARY_NAME) for Linux..."
-	@GOOS=linux GOARCH=amd64 go build -o bin/$(BINARY_NAME)-linux-amd64 $(MAIN_PATH)
+	@GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o bin/$(BINARY_NAME)-linux-amd64 $(MAIN_PATH)
+
+build-darwin:
+	@echo "Building $(BINARY_NAME) for macOS..."
+	@GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o bin/$(BINARY_NAME)-darwin-amd64 $(MAIN_PATH)
+	@GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o bin/$(BINARY_NAME)-darwin-arm64 $(MAIN_PATH)
+
+build-windows:
+	@echo "Building $(BINARY_NAME) for Windows..."
+	@GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o bin/$(BINARY_NAME)-windows-amd64.exe $(MAIN_PATH)
 
 test:
 	@echo "Running unit tests..."
@@ -94,8 +126,11 @@ docker-run:
 
 help:
 	@echo "Available targets:"
-	@echo "  build            - Build the binary"
+	@echo "  build            - Build the binary for current OS"
+	@echo "  release          - Build release binaries for all platforms (Linux, macOS, Windows)"
 	@echo "  build-linux      - Build for Linux AMD64"
+	@echo "  build-darwin     - Build for macOS (AMD64 + ARM64)"
+	@echo "  build-windows    - Build for Windows AMD64"
 	@echo "  test             - Run unit tests"
 	@echo "  test-coverage    - Run tests with coverage report"
 	@echo "  lint             - Run linter"
@@ -117,3 +152,6 @@ help:
 	@echo "  dev              - Build and start development server"
 	@echo "  docker-build     - Build Docker image"
 	@echo "  docker-run       - Run Docker container"
+	@echo ""
+	@echo "Variables:"
+	@echo "  VERSION          - Version to embed in binary (default: v0.3.0)"

@@ -15,10 +15,12 @@ import (
 	"MystiSql/internal/connection/pool"
 	"MystiSql/internal/connection/postgresql"
 	"MystiSql/internal/discovery"
+	"MystiSql/internal/service/audit"
 	"MystiSql/internal/service/auth"
 	"MystiSql/internal/service/batch"
 	"MystiSql/internal/service/query"
 	"MystiSql/internal/service/transaction"
+	"MystiSql/internal/service/validator"
 	"MystiSql/pkg/types"
 
 	"github.com/gin-gonic/gin"
@@ -31,6 +33,9 @@ type Server struct {
 	registry            discovery.InstanceRegistry
 	engine              *query.Engine
 	authService         *auth.AuthService
+	validatorService    *validator.ValidatorService
+	auditService        *audit.AuditService
+	auditLogFile        string
 	poolManager         *pool.ConnectionPoolManager
 	txManager           *transaction.TransactionManager
 	batchService        *batch.BatchService
@@ -41,18 +46,24 @@ type Server struct {
 	authHandlers        *AuthHandlers
 	transactionHandlers *TransactionHandlers
 	batchHandlers       *BatchHandlers
+	validatorHandlers   *ValidatorHandlers
+	auditHandlers       *AuditHandlers
 	version             string
+	wsHandlers          *WebSocketHandlers
 }
 
 // NewServer 创建新的 REST API 服务器
-func NewServer(config *types.ServerConfig, registry discovery.InstanceRegistry, engine *query.Engine, authService *auth.AuthService, logger *zap.Logger, version string) *Server {
+func NewServer(config *types.ServerConfig, registry discovery.InstanceRegistry, engine *query.Engine, authService *auth.AuthService, validatorService *validator.ValidatorService, auditService *audit.AuditService, auditLogFile string, logger *zap.Logger, version string) *Server {
 	return &Server{
-		config:      config,
-		registry:    registry,
-		engine:      engine,
-		authService: authService,
-		logger:      logger,
-		version:     version,
+		config:           config,
+		registry:         registry,
+		engine:           engine,
+		authService:      authService,
+		validatorService: validatorService,
+		auditService:     auditService,
+		auditLogFile:     auditLogFile,
+		logger:           logger,
+		version:          version,
 	}
 }
 
@@ -73,9 +84,20 @@ func (s *Server) Setup() error {
 	s.router = gin.New()
 
 	// 创建处理器
-	s.handlers = NewHandlers(s.registry, s.engine, s.logger, s.version)
+	s.handlers = NewHandlers(s.registry, s.engine, s.validatorService, s.logger, s.version)
 	if s.authService != nil {
 		s.authHandlers = NewAuthHandlers(s.authService, s.logger)
+	}
+
+	// 初始化 WebSocket 处理器
+	if s.wsHandlers == nil && s.authService != nil && s.engine != nil {
+		wsConfig := WebSocketConfig{
+			Enabled:              true,
+			MaxConnections:       1000,
+			IdleTimeout:          10 * time.Minute,
+			MaxConcurrentQueries: 5,
+		}
+		s.wsHandlers = NewWebSocketHandlers(s.authService, s.engine, wsConfig, s.logger)
 	}
 
 	// 初始化 ConnectionPoolManager 和 TransactionManager
@@ -170,6 +192,11 @@ func (s *Server) setupRoutes() {
 		if s.batchHandlers != nil {
 			v1.POST("/batch", s.batchHandlers.ExecuteBatch)
 		}
+	}
+
+	// WebSocket 端点（独立于 API v1）
+	if s.wsHandlers != nil {
+		s.router.GET("/ws", s.wsHandlers.HandleWebSocket)
 	}
 }
 

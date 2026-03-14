@@ -92,6 +92,36 @@
 
 ---
 
+### Requirement: WebSocket 认证集成
+系统 SHALL 在 WebSocket 握手时验证 JWT Token。
+
+#### Scenario: URL 参数认证
+- **WHEN** 客户端连接 `ws://host:port/ws?token=<jwt>`
+- **THEN** 系统从 URL 查询参数提取 Token 并验证
+
+#### Scenario: Token 无效
+- **WHEN** Token 无效或已过期
+- **THEN** 系统拒绝连接并返回 HTTP 401
+
+---
+
+### Requirement: WebSocket 消息处理
+系统 SHALL 处理 JSON 格式的 WebSocket 消息。
+
+#### Scenario: 处理 query 消息
+- **WHEN** 收到 `{"action": "query", "instance": "...", "query": "...", "requestId": "..."}`
+- **THEN** 系统执行查询并返回 `{"requestId": "...", "success": true, "columns": [...], "rows": [...]}`
+
+#### Scenario: 处理 ping 消息
+- **WHEN** 收到 `{"action": "ping"}`
+- **THEN** 系统返回 `{"action": "pong"}`
+
+#### Scenario: 查询执行失败
+- **WHEN** SQL 执行失败
+- **THEN** 系统返回 `{"requestId": "...", "success": false, "error": "错误描述"}`
+
+---
+
 ### Requirement: WebSocket 路由注册
 系统 SHALL 在 REST API 服务器中注册 WebSocket 路由。
 

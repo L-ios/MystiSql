@@ -8,3 +8,4 @@ mystisql
 /coverage.out
 /e2e-*
 /session-*.md
+logs

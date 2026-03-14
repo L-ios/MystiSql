@@ -100,6 +100,16 @@ func (s *Server) Setup() error {
 		s.wsHandlers = NewWebSocketHandlers(s.authService, s.engine, wsConfig, s.logger)
 	}
 
+	// 初始化验证器处理器
+	if s.validatorService != nil {
+		s.validatorHandlers = NewValidatorHandlers(s.validatorService, s.logger)
+	}
+
+	// 初始化审计处理器
+	if s.auditService != nil {
+		s.auditHandlers = NewAuditHandlers(s.auditService, s.auditLogFile, s.logger)
+	}
+
 	// 初始化 ConnectionPoolManager 和 TransactionManager
 	if err := s.initTransactionManager(); err != nil {
 		s.logger.Warn("Failed to initialize transaction manager", zap.Error(err))
@@ -191,6 +201,17 @@ func (s *Server) setupRoutes() {
 		// 批量操作端点
 		if s.batchHandlers != nil {
 			v1.POST("/batch", s.batchHandlers.ExecuteBatch)
+		}
+
+		// 添加 validator 白名单/黑名单 API
+		if s.validatorHandlers != nil {
+			validatorGroup := v1.Group("/validator")
+			{
+				validatorGroup.GET("/whitelist", s.validatorHandlers.GetWhitelist)
+				validatorGroup.POST("/whitelist", s.validatorHandlers.UpdateWhitelist)
+				validatorGroup.GET("/blacklist", s.validatorHandlers.GetBlacklist)
+				validatorGroup.POST("/blacklist", s.validatorHandlers.UpdateBlacklist)
+			}
 		}
 	}
 

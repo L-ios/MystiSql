@@ -9,3 +9,5 @@ mystisql
 /e2e-*
 /session-*.md
 logs
+test.txt
+web/dist

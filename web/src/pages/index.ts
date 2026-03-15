@@ -1,0 +1,5 @@
+export { default as Login } from './Login'
+export { default as Dashboard } from './Dashboard'
+export { default as Query } from './Query'
+export { default as Instances } from './Instances'
+export { default as AuditLogs } from './AuditLogs'

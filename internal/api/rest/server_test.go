@@ -34,7 +34,7 @@ func setupTestServer(t testing.TB) (*Server, *discovery.Registry) {
 		Mode: "debug",
 	}
 
-	server := NewServer(config, registry, engine, authService, nil, nil, "", logger, "test-version")
+	server := NewServer(config, &types.WebUIConfig{Enabled: false, Mode: "embedded"}, registry, engine, authService, nil, nil, "", logger, "test-version")
 
 	return server, registry
 }
@@ -91,7 +91,7 @@ func TestServerMode(t *testing.T) {
 				Mode: tt.mode,
 			}
 
-			server := NewServer(config, registry, engine, authService, nil, nil, "", logger, "test-version")
+			server := NewServer(config, &types.WebUIConfig{Enabled: false, Mode: "embedded"}, registry, engine, authService, nil, nil, "", logger, "test-version")
 			if err := server.Setup(); err != nil {
 				t.Fatalf("设置服务器失败: %v", err)
 			}
@@ -190,7 +190,7 @@ func TestServerAddress(t *testing.T) {
 				Mode: "debug",
 			}
 
-			server := NewServer(config, registry, engine, authService, nil, nil, "", logger, "test-version")
+			server := NewServer(config, &types.WebUIConfig{Enabled: false, Mode: "embedded"}, registry, engine, authService, nil, nil, "", logger, "test-version")
 			if err := server.Setup(); err != nil {
 				t.Fatalf("设置服务器失败: %v", err)
 			}
@@ -215,7 +215,7 @@ func TestVersion(t *testing.T) {
 	}
 
 	version := "v1.0.0-test"
-	server := NewServer(config, registry, engine, authService, nil, nil, "", logger, version)
+	server := NewServer(config, &types.WebUIConfig{Enabled: false, Mode: "embedded"}, registry, engine, authService, nil, nil, "", logger, version)
 
 	if server.version != version {
 		t.Errorf("版本信息错误 got %v, want %v", server.version, version)

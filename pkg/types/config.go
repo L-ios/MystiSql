@@ -100,6 +100,12 @@ type WebSocketConfig struct {
 	MaxConcurrentQueries int    `json:"maxConcurrentQueries" yaml:"maxConcurrentQueries"`
 }
 
+// WebUIConfig 定义 WebUI 配置
+type WebUIConfig struct {
+	Enabled bool   `json:"enabled" yaml:"enabled"`
+	Mode    string `json:"mode" yaml:"mode"` // embedded | external
+}
+
 // Config 定义应用程序的根配置
 type Config struct {
 	Server    ServerConfig     `json:"server" yaml:"server"`
@@ -109,6 +115,7 @@ type Config struct {
 	Discovery DiscoveryConfig  `json:"discovery" yaml:"discovery"`
 	Health    HealthConfig     `json:"health" yaml:"health"`
 	Pool      PoolConfig       `json:"pool" yaml:"pool"`
+	WebUI     WebUIConfig      `json:"webui" yaml:"webui"`
 	Instances []InstanceConfig `json:"instances" yaml:"instances"`
 }
 
@@ -163,6 +170,10 @@ func NewConfig() *Config {
 			MaxLifetime:       "1h",
 			ConnectionTimeout: "10s",
 			PingInterval:      "30s",
+		},
+		WebUI: WebUIConfig{
+			Enabled: true,
+			Mode:    "embedded",
 		},
 		Instances: make([]InstanceConfig, 0),
 	}

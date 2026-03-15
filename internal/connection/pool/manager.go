@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"MystiSql/internal/connection"
+	"MystiSql/internal/connection/monitor"
 	"MystiSql/pkg/types"
 )
 
@@ -15,14 +16,23 @@ type PooledConnection interface {
 	Close() error
 }
 
-type ConnectionPoolManager struct {
-	pools   map[string]connection.ConnectionPool
-	factory connection.ConnectionFactory
-	config  *connection.PoolConfig
-	mu      sync.RWMutex
+type ManagerOption func(*ConnectionPoolManager)
+
+func WithManagerMetrics(collector *monitor.Collector) ManagerOption {
+	return func(m *ConnectionPoolManager) {
+		m.metricsCollector = collector
+	}
 }
 
-func NewConnectionPoolManager(factory connection.ConnectionFactory, config *connection.PoolConfig) *ConnectionPoolManager {
+type ConnectionPoolManager struct {
+	pools            map[string]connection.ConnectionPool
+	factory          connection.ConnectionFactory
+	config           *connection.PoolConfig
+	mu               sync.RWMutex
+	metricsCollector *monitor.Collector
+}
+
+func NewConnectionPoolManager(factory connection.ConnectionFactory, config *connection.PoolConfig, opts ...ManagerOption) *ConnectionPoolManager {
 	if config == nil {
 		config = &connection.PoolConfig{
 			MaxConnections:    10,
@@ -34,11 +44,18 @@ func NewConnectionPoolManager(factory connection.ConnectionFactory, config *conn
 		}
 	}
 
-	return &ConnectionPoolManager{
-		pools:   make(map[string]connection.ConnectionPool),
-		factory: factory,
-		config:  config,
+	mgr := &ConnectionPoolManager{
+		pools:            make(map[string]connection.ConnectionPool),
+		factory:          factory,
+		config:           config,
+		metricsCollector: monitor.DefaultCollector(),
 	}
+
+	for _, opt := range opts {
+		opt(mgr)
+	}
+
+	return mgr
 }
 
 func (cpm *ConnectionPoolManager) GetConnection(ctx context.Context, instance string) (PooledConnection, error) {
@@ -55,7 +72,12 @@ func (cpm *ConnectionPoolManager) GetConnection(ctx context.Context, instance st
 		return nil, err
 	}
 
-	return &pooledConnectionWrapper{conn: conn, pool: pool}, nil
+	return &pooledConnectionWrapper{
+		conn:      conn,
+		pool:      pool,
+		instance:  instance,
+		collector: cpm.metricsCollector,
+	}, nil
 }
 
 func (cpm *ConnectionPoolManager) AddInstance(instance *types.DatabaseInstance) error {
@@ -66,7 +88,12 @@ func (cpm *ConnectionPoolManager) AddInstance(instance *types.DatabaseInstance) 
 		return fmt.Errorf("connection pool already exists for instance: %s", instance.Name)
 	}
 
-	pool, err := NewConnectionPool(instance, cpm.factory, cpm.config)
+	opts := []PoolOption{}
+	if cpm.metricsCollector != nil {
+		opts = append(opts, WithMetricsCollector(cpm.metricsCollector))
+	}
+
+	pool, err := NewConnectionPool(instance, cpm.factory, cpm.config, opts...)
 	if err != nil {
 		return fmt.Errorf("failed to create connection pool for instance %s: %w", instance.Name, err)
 	}
@@ -107,9 +134,56 @@ func (cpm *ConnectionPoolManager) Close() error {
 	return lastErr
 }
 
+func (cpm *ConnectionPoolManager) GetPoolStats(instance string) *connection.PoolStats {
+	cpm.mu.RLock()
+	pool, exists := cpm.pools[instance]
+	cpm.mu.RUnlock()
+
+	if !exists {
+		return nil
+	}
+
+	return pool.GetStats()
+}
+
+func (cpm *ConnectionPoolManager) GetAllPoolStats() map[string]*connection.PoolStats {
+	cpm.mu.RLock()
+	defer cpm.mu.RUnlock()
+
+	stats := make(map[string]*connection.PoolStats)
+	for name, pool := range cpm.pools {
+		stats[name] = pool.GetStats()
+	}
+
+	return stats
+}
+
+func (cpm *ConnectionPoolManager) GetMetricsCollector() *monitor.Collector {
+	return cpm.metricsCollector
+}
+
+func (cpm *ConnectionPoolManager) GetPool(instance string) connection.ConnectionPool {
+	cpm.mu.RLock()
+	defer cpm.mu.RUnlock()
+	return cpm.pools[instance]
+}
+
+func (cpm *ConnectionPoolManager) ListInstances() []string {
+	cpm.mu.RLock()
+	defer cpm.mu.RUnlock()
+
+	instances := make([]string, 0, len(cpm.pools))
+	for name := range cpm.pools {
+		instances = append(instances, name)
+	}
+	return instances
+}
+
 type pooledConnectionWrapper struct {
-	conn connection.Connection
-	pool connection.ConnectionPool
+	conn      connection.Connection
+	pool      connection.ConnectionPool
+	instance  string
+	collector *monitor.Collector
 }
 
 func (w *pooledConnectionWrapper) Query(ctx context.Context, sql string) (*types.QueryResult, error) {

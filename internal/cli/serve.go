@@ -98,7 +98,7 @@ var serveCmd = &cobra.Command{
 		}
 
 		// 创建并初始化 API 服务器
-		server := rest.NewServer(&cfg.Server, GetRegistry(), engine, authService, validatorService, auditService, auditLogFile, logger, Version)
+		server := rest.NewServer(&cfg.Server, &cfg.WebUI, GetRegistry(), engine, authService, validatorService, auditService, auditLogFile, logger, Version)
 		if err := server.Setup(); err != nil {
 			return fmt.Errorf("初始化服务器失败: %w", err)
 		}

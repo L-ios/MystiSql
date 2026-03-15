@@ -22,6 +22,7 @@ import (
 	"MystiSql/internal/service/transaction"
 	"MystiSql/internal/service/validator"
 	"MystiSql/pkg/types"
+	webui "MystiSql/web"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -30,6 +31,7 @@ import (
 // Server REST API 服务器
 type Server struct {
 	config              *types.ServerConfig
+	webuiConfig         *types.WebUIConfig
 	registry            discovery.InstanceRegistry
 	engine              *query.Engine
 	authService         *auth.AuthService
@@ -50,12 +52,14 @@ type Server struct {
 	auditHandlers       *AuditHandlers
 	version             string
 	wsHandlers          *WebSocketHandlers
+	webuiHandler        *webui.Handler
 }
 
 // NewServer 创建新的 REST API 服务器
-func NewServer(config *types.ServerConfig, registry discovery.InstanceRegistry, engine *query.Engine, authService *auth.AuthService, validatorService *validator.ValidatorService, auditService *audit.AuditService, auditLogFile string, logger *zap.Logger, version string) *Server {
+func NewServer(config *types.ServerConfig, webuiConfig *types.WebUIConfig, registry discovery.InstanceRegistry, engine *query.Engine, authService *auth.AuthService, validatorService *validator.ValidatorService, auditService *audit.AuditService, auditLogFile string, logger *zap.Logger, version string) *Server {
 	return &Server{
 		config:           config,
+		webuiConfig:      webuiConfig,
 		registry:         registry,
 		engine:           engine,
 		authService:      authService,
@@ -108,6 +112,17 @@ func (s *Server) Setup() error {
 	// 初始化审计处理器
 	if s.auditService != nil {
 		s.auditHandlers = NewAuditHandlers(s.auditService, s.auditLogFile, s.logger)
+	}
+
+	// 初始化 WebUI 处理器
+	if s.webuiConfig != nil && s.webuiConfig.Enabled && s.webuiConfig.Mode == "embedded" {
+		webuiHandler, err := webui.NewHandler()
+		if err != nil {
+			s.logger.Warn("Failed to initialize WebUI handler", zap.Error(err))
+		} else {
+			s.webuiHandler = webuiHandler
+			s.logger.Info("WebUI handler initialized")
+		}
 	}
 
 	// 初始化 ConnectionPoolManager 和 TransactionManager
@@ -226,6 +241,11 @@ func (s *Server) setupRoutes() {
 	// WebSocket 端点（独立于 API v1）
 	if s.wsHandlers != nil {
 		s.router.GET("/ws", s.wsHandlers.HandleWebSocket)
+	}
+
+	// WebUI 端点（必须在所有 API 路由之后）
+	if s.webuiHandler != nil {
+		s.router.NoRoute(gin.WrapH(s.webuiHandler))
 	}
 }
 

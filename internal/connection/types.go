@@ -63,29 +63,64 @@ type ConnectionPool interface {
 
 // PoolStats 定义连接池统计信息
 type PoolStats struct {
-	// TotalConnections 总连接数
-	TotalConnections int
-
-	// IdleConnections 空闲连接数
-	IdleConnections int
-
-	// ActiveConnections 活跃连接数
+	TotalConnections  int
+	IdleConnections   int
 	ActiveConnections int
+	MaxConnections    int
+	MinConnections    int
+	AcquireCount      int64
+	AcquireFailed     int64
+	ReleaseCount      int64
 
-	// MaxConnections 最大连接数
-	MaxConnections int
+	WaitCount          int64
+	WaitDuration       int64
+	MaxWaitDuration    int64
+	AvgWaitDuration    int64
+	AcquireDuration    int64
+	MaxAcquireDuration int64
+	AvgAcquireDuration int64
 
-	// MinConnections 最小连接数
-	MinConnections int
+	QueryCount    int64
+	QueryFailed   int64
+	QueryDuration int64
 
-	// AcquireCount 获取连接的总次数
-	AcquireCount int64
+	ExecCount    int64
+	ExecFailed   int64
+	ExecDuration int64
 
-	// AcquireFailed 获取连接失败的次数
-	AcquireFailed int64
+	HealthCheckCount  int64
+	HealthCheckFailed int64
 
-	// ReleaseCount 释放连接的总次数
-	ReleaseCount int64
+	ConnectionsCreated int64
+	ConnectionsClosed  int64
+
+	LastAcquireTime int64
+	LastReleaseTime int64
+	LastErrorTime   int64
+	LastErrorMsg    string
+}
+
+type MetricsCollector interface {
+	RecordAcquire(instance string, duration int64, success bool)
+	RecordRelease(instance string, duration int64)
+	RecordWait(instance string, duration int64)
+	RecordQuery(instance string, duration int64, success bool)
+	RecordExec(instance string, duration int64, success bool)
+	RecordHealthCheck(instance string, success bool)
+	RecordConnectionCreated(instance string)
+	RecordConnectionClosed(instance string)
+	UpdatePoolStats(instance string, stats *PoolStats)
+	GetAllMetrics() map[string]*PoolStats
+}
+
+type MetricsEvent struct {
+	Type      string
+	Instance  string
+	Timestamp int64
+	Duration  int64
+	Success   bool
+	Error     string
+	Stats     *PoolStats
 }
 
 // PoolConfig 定义连接池配置

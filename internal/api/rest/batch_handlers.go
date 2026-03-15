@@ -55,6 +55,13 @@ func (h *BatchHandlers) ExecuteBatch(c *gin.Context) {
 		return
 	}
 
+	if req.Instance == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Instance name is required",
+		})
+		return
+	}
+
 	timeout := 5 * time.Minute
 	ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
 	defer cancel()

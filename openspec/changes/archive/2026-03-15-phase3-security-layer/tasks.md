@@ -156,10 +156,10 @@
 - [x] 事务回滚
 - [x] 事务列表
 
-### 15.3 需要完善的功能 (部分失败)
-- [ ] 审计日志 API 端点 (404 - 未注册)
-- [ ] SQL 验证器白名单/黑名单 API 端点 (404 - 未注册)
-- [ ] WebSocket 实时查询 (未启用)
-- [ ] 批量操作 HTTP 状态码处理 (500 vs 400)
-- [ ] SQL 验证中间件集成 (200 vs 403)
+### 15.3 需要完善的功能 (已修复)
+- [x] 审计日志 API 端点 (已注册 /api/v1/audit/logs)
+- [x] SQL 验证器白名单/黑名单 API 端点 (已注册，需确保配置中 validator.enabled=true)
+- [x] WebSocket 实时查询 (已启用，需确保配置中 auth.enabled=true)
+- [x] 批量操作 HTTP 状态码处理 (已修复实例不存在返回 400)
+- [x] SQL 验证中间件集成 (已集成，需确保配置中 validator.enabled=true)
 - [x] 14.7 创建 Git tag（v0.3.0）

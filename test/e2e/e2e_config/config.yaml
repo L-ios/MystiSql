@@ -1,0 +1,53 @@
+server:
+  host: "0.0.0.0"
+  port: 8080
+  mode: "debug"
+
+auth:
+  enabled: true
+  token:
+    secret: "your-secret-key-for-e2e-testing"
+    expire: "24h"
+  whitelist:
+    - "/health"
+    - "/api/v1/instances"
+    - "/api/v1/query"
+    - "/api/v1/exec"
+    - "/api/v1/transaction/begin"
+    - "/api/v1/transaction/commit"
+    - "/api/v1/transaction/rollback"
+    - "/api/v1/transaction/:id"
+    - "/api/v1/transaction/:id/extend"
+    - /api/v1/batch
+
+audit:
+  enabled: true
+  logFile: "logs/audit.log"
+  retentionDays: 30
+
+validator:
+  enabled: true
+  dangerousOperations:
+    - "DROP"
+    - "TRUNCATE"
+    - "DELETEWithoutWhere"
+    - "updateWithoutWhere"
+  whitelist: []
+  blacklist: []
+
+websocket:
+  enabled: true
+  maxConnections: 1000
+  idleTimeout: "10m"
+  maxConcurrentQueries: 5
+
+discovery:
+  type: "static"
+  instances:
+    - name: "local-mysql"
+      type: "mysql"
+      host: "localhost"
+      port: 13306
+      username: "root"
+      password: "test123456"
+      database: "mystisql_test"

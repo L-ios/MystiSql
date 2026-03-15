@@ -213,6 +213,14 @@ func (s *Server) setupRoutes() {
 				validatorGroup.POST("/blacklist", s.validatorHandlers.UpdateBlacklist)
 			}
 		}
+
+		// 添加审计日志 API
+		if s.auditHandlers != nil {
+			auditGroup := v1.Group("/audit")
+			{
+				auditGroup.GET("/logs", s.auditHandlers.QueryLogs)
+			}
+		}
 	}
 
 	// WebSocket 端点（独立于 API v1）

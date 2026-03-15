@@ -31,7 +31,13 @@ func NewAuditHandlers(auditService *audit.AuditService, logFilePath string, logg
 
 func (h *AuditHandlers) QueryLogs(c *gin.Context) {
 	startTimeStr := c.Query("start")
+	if startTimeStr == "" {
+		startTimeStr = c.Query("start_time")
+	}
 	endTimeStr := c.Query("end")
+	if endTimeStr == "" {
+		endTimeStr = c.Query("end_time")
+	}
 	userID := c.Query("user_id")
 	instance := c.Query("instance")
 	pageStr := c.DefaultQuery("page", "1")

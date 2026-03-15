@@ -413,62 +413,62 @@ flowchart TB
 
 > 按照从底层到上层、从基础功能到高级功能的顺序规划，JDBC驱动作为核心接入能力优先实现
 
-### Phase 1: 基础设施层 (Infrastructure)
+### Phase 1: 基础设施层 (Infrastructure) ✅ 已完成
 
 **目标**：建立最底层的基础能力，实现数据库实例发现和连接
 
 #### 1.1 服务发现层 - 基础功能
-- [ ] 实例注册接口（手动添加数据库实例）
-- [ ] 静态配置发现（从配置文件读取实例列表）
-- [ ] 实例信息存储（内存/文件）
+- [x] 实例注册接口（手动添加数据库实例）
+- [x] 静态配置发现（从配置文件读取实例列表）
+- [x] 实例信息存储（内存/文件）
 
 #### 1.2 连接层 - 基础功能
-- [ ] MySQL驱动集成（go-sql-driver/mysql）
-- [ ] 连接建立（基础连接功能）
-- [ ] 连接配置管理（host、port、username、password）
+- [x] MySQL驱动集成（go-sql-driver/mysql）
+- [x] 连接建立（基础连接功能）
+- [x] 连接配置管理（host、port、username、password）
 
 #### 1.3 接入层 - 基础功能
-- [ ] RESTful API框架搭建（Gin）
-- [ ] 健康检查接口
-- [ ] CLI基础框架（cobra）
+- [x] RESTful API框架搭建（Gin）
+- [x] 健康检查接口
+- [x] CLI基础框架（cobra）
 
 **交付物**：能够通过配置文件添加MySQL实例，通过API/CLI连接并执行简单SQL
 
 ---
 
-### Phase 2: 核心引擎层 + JDBC驱动 (Core Engine & JDBC)
+### Phase 2: 核心引擎层 + JDBC驱动 (Core Engine & JDBC) ✅ 已完成
 
 **目标**：实现SQL查询的核心处理能力，**同时发布JDBC驱动**，让用户可以在DataGrip、DBeaver等工具中使用
 
 #### 2.1 服务发现层 - 中级功能
-- [ ] K8s API动态发现（client-go）
-- [ ] ConfigMap配置源支持
-- [ ] 实例状态监控（健康检查）
+- [x] K8s API动态发现（client-go）
+- [x] ConfigMap配置源支持
+- [x] 实例状态监控（健康检查）
 
 #### 2.2 连接层 - 中级功能
-- [ ] 连接池管理（连接复用）
-- [ ] 连接健康检查
-- [ ] 自动重连机制
+- [x] 连接池管理（连接复用）
+- [x] 连接健康检查
+- [x] 自动重连机制
 
 #### 2.3 服务层 - 核心引擎
-- [ ] SQL解析（基础SQL语法解析）
-- [ ] SQL路由（根据实例名路由）
-- [ ] 查询超时控制
-- [ ] 结果集大小限制
-- [ ] 表结构缓存（Schema Cache）
+- [x] SQL解析（基础SQL语法解析）
+- [x] SQL路由（根据实例名路由）
+- [x] 查询超时控制
+- [x] 结果集大小限制
+- [x] 表结构缓存（Schema Cache）
 
 #### 2.4 接入层 - 基础功能完善
-- [ ] SQL执行接口（POST /api/v1/query）
-- [ ] 实例列表接口（GET /api/v1/instances）
-- [ ] CLI查询命令（mystisql query）
+- [x] SQL执行接口（POST /api/v1/query）
+- [x] 实例列表接口（GET /api/v1/instances）
+- [x] CLI查询命令（mystisql query）
 
 #### 2.5 JDBC驱动 - 核心功能 ⭐P0
-- [ ] JDBC Driver基础框架（实现Driver接口）
-- [ ] Connection连接实现（连接MystiSql Gateway）
-- [ ] Statement/PreparedStatement实现（SQL执行）
-- [ ] ResultSet结果集实现（结果返回）
-- [ ] DatabaseMetaData实现（元数据查询，支持IDE工具识别）
-- [ ] 连接URL格式：`jdbc:mystisql://gateway-host:port/database-instance`
+- [x] JDBC Driver基础框架（实现Driver接口）
+- [x] Connection连接实现（连接MystiSql Gateway）
+- [x] Statement/PreparedStatement实现（SQL执行）
+- [x] ResultSet结果集实现（结果返回）
+- [x] DatabaseMetaData实现（元数据查询，支持IDE工具识别）
+- [x] 连接URL格式：`jdbc:mystisql://gateway-host:port/database-instance`
 
 **交付物**：
 - 完整的SQL查询能力，支持K8s动态发现，连接池管理
@@ -476,30 +476,30 @@ flowchart TB
 
 ---
 
-### Phase 3: 安全控制层 (Security)
+### Phase 3: 安全控制层 (Security) ✅ 已完成
 
 **目标**：实现企业级安全控制能力
 
 #### 3.1 服务层 - 安全控制
-- [ ] Token认证（基础认证）
-- [ ] SQL执行记录（审计日志基础）
-- [ ] 危险操作检测（DROP、TRUNCATE拦截）
-- [ ] SQL白名单/黑名单
+- [x] Token认证（JWT HS256签名）
+- [x] SQL执行记录（审计日志基础）
+- [x] 危险操作检测（DROP、TRUNCATE拦截）
+- [x] SQL白名单/黑名单（正则匹配）
 
 #### 3.2 接入层 - 中级功能
-- [ ] WebSocket支持（实时交互）
-- [ ] CLI认证集成
-- [ ] API认证中间件
+- [x] WebSocket支持（实时交互）
+- [x] CLI认证集成（auth子命令）
+- [x] API认证中间件（Gin中间件）
 
 #### 3.3 连接层 - 扩展
-- [ ] PostgreSQL驱动支持（pgx）
-- [ ] 多数据库类型路由
+- [x] PostgreSQL驱动支持（pgx）
+- [x] 多数据库类型路由（根据type字段）
 
 #### 3.4 JDBC驱动 - 增强
-- [ ] JDBC连接池支持（HikariCP兼容）
-- [ ] 事务支持（基础事务管理）
-- [ ] 批量操作支持
-- [ ] 认证集成（Token传递）
+- [x] JDBC连接池支持（HikariCP兼容）
+- [x] 事务支持（begin/commit/rollback API）
+- [x] 批量操作支持（POST /api/v1/batch）
+- [x] 认证集成（Token传递）
 
 **交付物**：具备安全控制能力的数据库访问网关，JDBC驱动功能完善
 
@@ -604,56 +604,96 @@ gantt
 | **M1** | Phase 1 | 可连接MySQL执行SQL | ✅ 已完成 |
 | **M2** | Phase 2 | **JDBC驱动发布**、K8s动态发现、连接池、完整查询能力 | ✅ 已完成 |
 | **M3** | Phase 3 | 安全认证、审计日志、PostgreSQL支持、WebSocket、JDBC增强 | ✅ 已完成 |
-| **M4** | Phase 4 | 企业级权限、读写分离、WebUI上线 | ⏳ 进行中 |
+| **M4** | Phase 4 | 企业级权限、读写分离、WebUI上线 | ⏳ 规划中 |
 | **M5** | Phase 5 | 智能化运维平台 | 📋 规划中 |
+
+### 功能规格 (OpenSpec)
+
+项目使用 OpenSpec 管理功能规格，所有规格定义在 `openspec/specs/` 目录：
+
+| 类别 | 规格 | 描述 |
+|------|------|------|
+| **数据库连接** | mysql-connection | MySQL 连接和查询 |
+| | postgresql-driver | PostgreSQL 驱动支持 |
+| **REST API** | rest-api | RESTful API 端点 |
+| | websocket-support | WebSocket 实时交互 |
+| **安全认证** | token-auth | JWT Token 认证 |
+| | api-auth-middleware | API 认证中间件 |
+| | cli-auth | CLI 认证集成 |
+| **审计验证** | audit-logging | 审计日志记录 |
+| | sql-validator | SQL 安全检查 |
+| | sql-whitelist-blacklist | SQL 白名单/黑名单 |
+| **JDBC** | java-jdbc-driver | Java JDBC 驱动 |
+| | jdbc-transaction | JDBC 事务管理 |
+| | jdbc-batch-operations | JDBC 批量操作 |
+| | jdbc-prepared-statement | JDBC 预编译语句 |
+| | jdbc-metadata | JDBC 元数据 |
+| | jdbc-api-client | JDBC API 客户端 |
+| **CLI** | cli-interface | CLI 接口 |
+| | cli-tui | TUI 界面 |
+| | mysql-cli-style-repl | MySQL 风格 REPL |
+| | repl-line-editing | REPL 行编辑 |
+| | multiline-sql-input | 多行 SQL 输入 |
+| | streaming-output | 流式输出 |
+| | sql-execution-tui | TUI SQL 执行 |
+| | instance-switching-tui | TUI 实例切换 |
+| **基础设施** | config-management | 配置管理 |
+| | instance-discovery-static | 静态实例发现 |
+| | directory-structure | 目录结构 |
 
 ### Phase 3: 安全控制层 - 实现完成 ✅
 
-**完成度**: 57/102 任务 (55.9%) - **核心安全功能 100% 完成**
+**完成度**: 112/112 任务 (100%) - **全部功能已完成**
 
-#### 已实现的核心功能
+#### 已实现的功能模块
 
 **1. Token 认证机制** ✅
 - JWT Token 生成和验证 (HS256签名)
 - Token 黑名单管理
-- REST API: 生成/撤销/查询 Token
-- 单元测试覆盖
+- REST API: POST/DELETE/GET /api/v1/auth/token
+- CLI auth 子命令: token, revoke, info
 
 **2. 审计日志系统** ✅
 - 异步日志写入 (buffered channel)
 - 日志轮转机制 (按天轮转，保留30天)
 - 结构化日志格式 (JSON Lines)
-- REST API: 查询审计日志
+- REST API: GET /api/v1/audit/logs
 
 **3. SQL 安全检查** ✅
 - 危险操作检测 (DROP、TRUNCATE、无WHERE的DELETE/UPDATE)
 - SQL 白名单/黑名单 (正则匹配)
 - 优先级逻辑 (黑名单优先)
-- 配置持久化
+- 配置热更新
 
 **4. API 认证中间件** ✅
 - Gin 认证中间件
-- 白名单路径配置
-- 用户信息注入
+- 白名单路径配置 (/health 无需认证)
+- 用户信息注入到 gin.Context
 - 认证失败日志记录
 
 **5. PostgreSQL 驱动支持** ✅
-- PostgreSQL Connection 实现
+- PostgreSQL Connection 实现 (pgx驱动)
 - ConnectionPool 管理
-- 多数据库类型路由
-- 错误处理
-- 单元测试和集成测试
+- 多数据库类型路由 (根据 instance.type 选择驱动)
+- PostgreSQL 特有配置 (sslmode, connectTimeout)
 
 **6. WebSocket 实时交互** ✅
-- WebSocket 握手处理器
+- WebSocket 握手处理器 (Token认证)
 - 消息格式定义 (JSON)
-- 连接管理 (最大连接数、空闲超时)
+- 连接管理 (最大连接数、空闲超时、并发查询限制)
 - 心跳机制 (ping/pong)
 
-**7. JDBC 事务管理** 🔶 (进行中)
-- 事务上下文管理
-- 连接池管理器
-- 事务隔离级别支持
+**7. JDBC 事务管理** ✅
+- 事务上下文管理 (connectionId绑定)
+- REST API: begin/commit/rollback
+- 事务超时自动回滚
+- 事务隔离级别配置
+
+**8. JDBC 批量操作** ✅
+- 批量 SQL 执行器 (INSERT/UPDATE/DELETE)
+- 混合批处理支持
+- 批量操作大小限制 (默认1000)
+- REST API: POST /api/v1/batch
 
 #### 配置示例
 
@@ -720,10 +760,10 @@ websocket:
 
 | 类别 | 数量 |
 |------|------|
-| 源代码文件 | 49 个 |
-| 测试文件 | 17 个 |
-| 代码总行数 | ~11,500 行 |
-| 新增模块 | 9 个 |
+| 功能规格 (OpenSpec) | 28 个 |
+| 源代码文件 | 60+ 个 |
+| 测试文件 | 25+ 个 |
+| 代码总行数 | ~15,000 行 |
 
 #### 生产就绪度
 
@@ -735,9 +775,11 @@ websocket:
 | 认证中间件 | 100% | ✅ 是 | ✅ 完整 |
 | PostgreSQL | 100% | ✅ 是 | ✅ 完整 |
 | WebSocket | 100% | ✅ 是 | ✅ 完整 |
-| JDBC 事务 | 12.5% | ❌ 否 | ⚠️ 部分 |
+| JDBC 事务 | 100% | ✅ 是 | ✅ 完整 |
+| JDBC 批量操作 | 100% | ✅ 是 | ✅ 完整 |
+| CLI 认证 | 100% | ✅ 是 | ✅ 完整 |
 
-**总体生产就绪度**: **70%** - 核心安全功能已就绪
+**总体生产就绪度**: **100%** - Phase 3 全部功能已就绪
 
 ### JDBC驱动使用场景
 

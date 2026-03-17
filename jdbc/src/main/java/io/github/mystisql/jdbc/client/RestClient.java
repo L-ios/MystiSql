@@ -16,8 +16,10 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * RESTful API client for MystiSql Gateway.
+ * 
+ * <p>实现 {@link Transport} 接口，通过 HTTP RESTful API 与 Gateway 通信。</p>
  */
-public class RestClient {
+public class RestClient implements Transport {
     
     private static final Logger logger = LoggerFactory.getLogger(RestClient.class);
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
@@ -335,9 +337,15 @@ public class RestClient {
     /**
      * Close HTTP client and release resources.
      */
+    @Override
     public void close() {
         httpClient.dispatcher().executorService().shutdown();
         httpClient.connectionPool().evictAll();
         logger.debug("RestClient closed");
+    }
+    
+    @Override
+    public String getTransportType() {
+        return "http";
     }
 }

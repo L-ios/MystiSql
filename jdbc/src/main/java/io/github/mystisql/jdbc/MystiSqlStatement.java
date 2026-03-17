@@ -1,7 +1,7 @@
 package io.github.mystisql.jdbc;
 
 import io.github.mystisql.jdbc.client.ExecResult;
-import io.github.mystisql.jdbc.client.RestClient;
+import io.github.mystisql.jdbc.client.Transport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,8 +34,8 @@ public class MystiSqlStatement implements Statement {
         
         closeCurrentResultSet();
         
-        RestClient client = connection.getRestClient();
-        currentResultSet = client.executeQuery(connection.getInstanceName(), sql);
+        Transport transport = connection.getTransport();
+        currentResultSet = transport.executeQuery(connection.getInstanceName(), sql);
         updateCount = -1;
         largeUpdateCount = -1;
         lastInsertId = null;
@@ -50,8 +50,8 @@ public class MystiSqlStatement implements Statement {
         
         closeCurrentResultSet();
         
-        RestClient client = connection.getRestClient();
-        ExecResult result = client.executeUpdate(connection.getInstanceName(), sql);
+        Transport transport = connection.getTransport();
+        ExecResult result = transport.executeUpdate(connection.getInstanceName(), sql);
         
         updateCount = result.getRowsAffected() != null ? result.getRowsAffected().intValue() : 0;
         largeUpdateCount = result.getRowsAffected() != null ? result.getRowsAffected() : 0L;

@@ -70,8 +70,12 @@ public class MystiSqlDriver implements Driver {
         String maxConnectionsStr = parseParameter(url, "maxConnections");
         int maxConnections = maxConnectionsStr != null ? Integer.parseInt(maxConnectionsStr) : 20;
         
+        // Parse transport parameter (default: ws for WebSocket)
+        String transportStr = parseParameter(url, "transport");
+        String transport = transportStr != null ? transportStr.toLowerCase() : "ws";
+        
         // Create connection
-        return new MystiSqlConnection(host, port, instanceName, username, token, timeout, ssl, verifySsl, maxConnections);
+        return new MystiSqlConnection(host, port, instanceName, username, token, timeout, ssl, verifySsl, maxConnections, transport);
     }
     
     /**

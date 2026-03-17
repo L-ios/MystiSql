@@ -1,6 +1,8 @@
 package io.github.mystisql.jdbc;
 
 import io.github.mystisql.jdbc.client.RestClient;
+import io.github.mystisql.jdbc.client.Transport;
+import io.github.mystisql.jdbc.client.WebSocketTransport;
 import java.sql.*;
 import java.util.Map;
 import java.util.Properties;
@@ -20,7 +22,8 @@ public class MystiSqlConnection implements Connection {
     private final boolean ssl;
     private final boolean verifySsl;
     private final int maxConnections;
-    private final RestClient restClient;
+    private final Transport transport;
+    private final String transportType;
     
     private boolean closed = false;
     private boolean autoCommit = true;
@@ -28,6 +31,12 @@ public class MystiSqlConnection implements Connection {
     public MystiSqlConnection(String host, int port, String instanceName, String username, 
                               String token, int timeout, boolean ssl, boolean verifySsl, 
                               int maxConnections) {
+        this(host, port, instanceName, username, token, timeout, ssl, verifySsl, maxConnections, null);
+    }
+    
+    public MystiSqlConnection(String host, int port, String instanceName, String username, 
+                              String token, int timeout, boolean ssl, boolean verifySsl, 
+                              int maxConnections, String transportType) {
         this.host = host;
         this.port = port;
         this.instanceName = instanceName;
@@ -38,10 +47,16 @@ public class MystiSqlConnection implements Connection {
         this.verifySsl = verifySsl;
         this.maxConnections = maxConnections;
         
-        // Initialize REST client
         String protocol = ssl ? "https" : "http";
         String baseUrl = String.format("%s://%s:%d", protocol, host, port);
-        this.restClient = new RestClient(baseUrl, token, timeout);
+        
+        this.transportType = transportType != null ? transportType.toLowerCase() : "ws";
+        
+        if ("http".equals(this.transportType)) {
+            this.transport = new RestClient(baseUrl, token, timeout);
+        } else {
+            this.transport = new WebSocketTransport(baseUrl, token, timeout);
+        }
     }
     
     @Override
@@ -62,8 +77,8 @@ public class MystiSqlConnection implements Connection {
             return;
         }
         closed = true;
-        if (restClient != null) {
-            restClient.close();
+        if (transport != null) {
+            transport.close();
         }
     }
     
@@ -161,7 +176,7 @@ public class MystiSqlConnection implements Connection {
             return false;
         }
         try {
-            return restClient.healthCheck(instanceName);
+            return transport.healthCheck(instanceName);
         } catch (Exception e) {
             return false;
         }
@@ -181,7 +196,17 @@ public class MystiSqlConnection implements Connection {
     public String getToken() { return token; }
     public int getTimeout() { return timeout; }
     public boolean isSsl() { return ssl; }
-    public RestClient getRestClient() { return restClient; }
+    public Transport getTransport() { return transport; }
+    public String getTransportType() { return transportType; }
+    
+    /**
+     * @deprecated Use {@link #getTransport()} instead. 
+     * Returns the transport as RestClient for backward compatibility.
+     */
+    @Deprecated
+    public RestClient getRestClient() { 
+        return transport instanceof RestClient ? (RestClient) transport : null; 
+    }
     
     // Placeholder implementations for remaining methods
     @Override public Statement createStatement(int resultSetType, int resultSetConcurrency) throws SQLException { return createStatement(); }

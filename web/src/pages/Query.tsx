@@ -138,13 +138,6 @@ export default function Query() {
     setCurrentSql(sql)
   }, [setCurrentSql])
 
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.ctrlKey && e.key === 'Enter') {
-      e.preventDefault()
-      handleExecute()
-    }
-  }, [handleExecute])
-
   const columns = result?.columns.map((col) => ({
     title: col.name,
     dataIndex: col.name,
@@ -227,12 +220,6 @@ export default function Query() {
             defaultLanguage="sql"
             value={currentSql}
             onChange={(value) => setCurrentSql(value || '')}
-            onKeyDown={(e) => {
-              if (e.ctrlKey && e.code === 'Enter') {
-                e.preventDefault()
-                handleExecute()
-              }
-            }}
             theme="vs"
             options={{
               minimap: { enabled: false },
@@ -241,6 +228,11 @@ export default function Query() {
               wordWrap: 'on',
               automaticLayout: true,
               scrollBeyondLastLine: false,
+            }}
+            onMount={(editor, monaco) => {
+              editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+                handleExecute()
+              })
             }}
           />
         </Card>

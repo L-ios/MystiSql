@@ -6,7 +6,6 @@ import type {
   QueryResponse,
   ExecRequest,
   ExecResponse,
-  GenerateTokenRequest,
   GenerateTokenResponse,
   TokenInfoResponse,
   InstanceHealthResponse,

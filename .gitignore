@@ -11,3 +11,5 @@ mystisql
 logs
 test.txt
 web/dist
+package-lock.json
+web/node_modules

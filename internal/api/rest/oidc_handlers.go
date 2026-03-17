@@ -1,27 +1,51 @@
 package rest
 
 import (
-	"encoding/json"
+	"MystiSql/internal/service/auth/oidc"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
-// OIDCLoginHandler initiates the OIDC login flow. In this minimal implementation,
-// we return a 501 Not Implemented response. A full implementation would redirect
-// to the IdP's authorization endpoint using a shared OIDC flow registry.
-func OIDCLoginHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusNotImplemented)
-	json.NewEncoder(w).Encode(map[string]string{
-		"error": "OIDC login not implemented in this build.",
-	})
+type OIDCHandlers struct {
+	flow      *oidc.OIDCFlow
+	providers map[string]string
+	logger    *zap.Logger
 }
 
-// OIDCCallbackHandler handles the IdP callback after user authentication.
-// This is a placeholder implementation that returns 501 status.
-func OIDCCallbackHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusNotImplemented)
-	json.NewEncoder(w).Encode(map[string]string{
-		"error": "OIDC callback not implemented in this build.",
-	})
+func NewOIDCHandlers(flow *oidc.OIDCFlow, providers map[string]string, logger *zap.Logger) *OIDCHandlers {
+	if flow == nil {
+		return nil
+	}
+	return &OIDCHandlers{
+		flow:      flow,
+		providers: providers,
+		logger:    logger,
+	}
+}
+
+func (h *OIDCHandlers) Login(c *gin.Context) {
+	providerName := c.Query("provider")
+	if providerName == "" {
+		if len(h.providers) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "no OIDC providers configured"})
+			return
+		}
+		providerNames := make([]string, 0, len(h.providers))
+		for name := range h.providers {
+			providerNames = append(providerNames, name)
+		}
+		c.JSON(http.StatusOK, gin.H{"providers": providerNames})
+		return
+	}
+	if _, exists := h.providers[providerName]; !exists {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "unknown OIDC provider: " + providerName})
+		return
+	}
+	h.flow.Login(providerName, c.Writer, c.Request)
+}
+
+func (h *OIDCHandlers) Callback(c *gin.Context) {
+	h.flow.Callback(c.Writer, c.Request)
 }

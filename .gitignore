@@ -2,7 +2,6 @@ go.sum
 .idea
 /bin/
 /coverage.out
-mystisql
 /rest.test
 /batch.test
 /coverage.out

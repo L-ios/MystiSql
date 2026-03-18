@@ -12,18 +12,15 @@ import (
 )
 
 // CORSMiddleware 创建 CORS 中间件
-// 允许跨域请求，配置 CORS 策略
 func CORSMiddleware() gin.HandlerFunc {
-	config := cors.Config{
+	return cors.New(cors.Config{
 		AllowAllOrigins:  true,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With"},
 		ExposeHeaders:    []string{"Content-Length", "Content-Type"},
-		AllowCredentials: true,
+		AllowCredentials: false,
 		MaxAge:           12 * time.Hour,
-	}
-
-	return cors.New(config)
+	})
 }
 
 // LoggerMiddleware 创建日志中间件

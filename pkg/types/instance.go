@@ -6,10 +6,16 @@ import "time"
 type DatabaseType string
 
 const (
-	DatabaseTypeMySQL      DatabaseType = "mysql"
-	DatabaseTypePostgreSQL DatabaseType = "postgresql"
-	DatabaseTypeOracle     DatabaseType = "oracle"
-	DatabaseTypeRedis      DatabaseType = "redis"
+	DatabaseTypeMySQL         DatabaseType = "mysql"
+	DatabaseTypePostgreSQL    DatabaseType = "postgresql"
+	DatabaseTypeOracle        DatabaseType = "oracle"
+	DatabaseTypeRedis         DatabaseType = "redis"
+	DatabaseTypeSQLite        DatabaseType = "sqlite"
+	DatabaseTypeMSSQL         DatabaseType = "mssql"
+	DatabaseTypeMongoDB       DatabaseType = "mongodb"
+	DatabaseTypeElasticsearch DatabaseType = "elasticsearch"
+	DatabaseTypeClickHouse    DatabaseType = "clickhouse"
+	DatabaseTypeEtcd          DatabaseType = "etcd"
 )
 
 // InstanceStatus 定义实例的健康状态

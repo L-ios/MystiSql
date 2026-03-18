@@ -109,13 +109,13 @@ func TestMiddleware(t *testing.T) {
 	router := server.GetRouter()
 
 	t.Run("CORS 中间件", func(t *testing.T) {
-		req := httptest.NewRequest("OPTIONS", "/health", nil)
-		req.Header.Set("Origin", "http://example.com")
-		req.Header.Set("Access-Control-Request-Method", "GET")
+		req := httptest.NewRequest("GET", "/health", nil)
+		req.Header.Set("Origin", "http://external-domain.com")
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 
-		assert.Equal(t, http.StatusNoContent, w.Code)
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.NotEmpty(t, w.Header().Get("Access-Control-Allow-Origin"))
 	})
 
 	t.Run("日志中间件", func(t *testing.T) {

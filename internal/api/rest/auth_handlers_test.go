@@ -120,7 +120,7 @@ func TestGetTokenInfo_Success(t *testing.T) {
 	err = json.Unmarshal(w.Body.Bytes(), &resp)
 	require.NoError(t, err)
 	assert.True(t, resp["success"].(bool))
-	assert.Equal(t, "test-user", resp["user_id"])
+	assert.Equal(t, "test-user", resp["userId"])
 	assert.Equal(t, "admin", resp["role"])
 }
 

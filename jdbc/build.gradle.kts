@@ -1,10 +1,11 @@
 plugins {
     `java-library`
     `maven-publish`
+    id("com.gradleup.shadow") version "8.3.5"
 }
 
 group = "io.github.mystisql"
-version = "1.1.0-SNAPSHOT"
+version = "1.1.0"
 
 repositories {
     mavenCentral()
@@ -52,8 +53,7 @@ tasks.jar {
     }
 }
 
-val fatJar = tasks.register("fatJar", Jar::class) {
-    group = "build"
+tasks.shadowJar {
     archiveClassifier.set("all")
     manifest {
         attributes(
@@ -63,22 +63,22 @@ val fatJar = tasks.register("fatJar", Jar::class) {
             "Automatic-Module-Name" to "io.github.mystisql.jdbc"
         )
     }
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     
-    dependsOn(configurations.runtimeClasspath)
-    from(sourceSets.main.get().output)
-    configurations.runtimeClasspath.get().forEach { dep ->
-        if (dep.isDirectory) {
-            from(dep)
-        } else {
-            from(zipTree(dep))
-        }
-    }
+    relocate("okhttp3", "io.github.mystisql.shaded.okhttp3")
+    relocate("okio", "io.github.mystisql.shaded.okio")
+    relocate("com.fasterxml.jackson", "io.github.mystisql.shaded.jackson")
+    relocate("org.java_websocket", "io.github.mystisql.shaded.websocket")
+    
     exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
+    
+    minimize {
+        exclude(dependency("org.java-websocket:Java-WebSocket:.*"))
+        exclude(dependency("com.fasterxml.jackson.core:.*:.*"))
+    }
 }
 
 tasks.build {
-    dependsOn(fatJar)
+    dependsOn(tasks.shadowJar)
 }
 
 publishing {

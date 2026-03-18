@@ -29,11 +29,12 @@ JDBC驱动SHALL通过HTTP RESTful API与MystiSql Gateway通信。
 
 JDBC 驱动 SHALL 使用传输层抽象支持多种通信方式。
 
-#### Scenario: WebSocket 传输（默认）
+#### Scenario: 默认 HTTP 传输
 
 - **WHEN** 连接 URL 不指定 transport 参数
-- **THEN** 驱动 SHALL 默认使用 WebSocketClient 传输
-- **AND** 建立长连接进行通信
+- **THEN** 驱动 SHALL 默认使用 RestClient 传输（HTTP）
+- **AND** 保持向后兼容
+- **AND** 可通过 `transport=ws` 显式启用 WebSocket
 
 #### Scenario: 强制使用 HTTP 传输
 

@@ -1,5 +1,7 @@
 package io.github.mystisql.jdbc;
 
+import io.github.mystisql.jdbc.client.RestClient;
+import io.github.mystisql.jdbc.client.WebSocketTransport;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -265,5 +267,88 @@ class MystiSqlConnectionTest {
         assertTrue(sslConn.isSsl());
         assertEquals("secure.example.com", sslConn.getHost());
         assertEquals(443, sslConn.getPort());
+    }
+
+    @Test
+    @DisplayName("Default transport should be HTTP")
+    void testDefaultTransportIsHttp() {
+        MystiSqlConnection conn = new MystiSqlConnection(
+            "localhost", 8080, "test", "user", "token", 30, false, true, 10
+        );
+        
+        assertEquals("http", conn.getTransportType());
+        assertNotNull(conn.getTransport());
+        assertTrue(conn.getTransport() instanceof RestClient);
+    }
+
+    @Test
+    @DisplayName("Transport parameter 'http' should use RestClient")
+    void testHttpTransportSelection() {
+        MystiSqlConnection conn = new MystiSqlConnection(
+            "localhost", 8080, "test", "user", "token", 30, false, true, 10, "http"
+        );
+        
+        assertEquals("http", conn.getTransportType());
+        assertTrue(conn.getTransport() instanceof RestClient);
+    }
+
+    @Test
+    @DisplayName("Transport parameter 'ws' should use WebSocketTransport")
+    void testWsTransportSelection() {
+        MystiSqlConnection conn = new MystiSqlConnection(
+            "localhost", 8080, "test", "user", "token", 30, false, true, 10, "ws"
+        );
+        
+        assertEquals("ws", conn.getTransportType());
+        assertTrue(conn.getTransport() instanceof WebSocketTransport);
+    }
+
+    @Test
+    @DisplayName("Transport parameter 'WS' (uppercase) should use WebSocketTransport")
+    void testWsTransportSelectionUppercase() {
+        MystiSqlConnection conn = new MystiSqlConnection(
+            "localhost", 8080, "test", "user", "token", 30, false, true, 10, "WS"
+        );
+        
+        assertEquals("ws", conn.getTransportType());
+        assertTrue(conn.getTransport() instanceof WebSocketTransport);
+    }
+
+    @Test
+    @DisplayName("Transport parameter 'websocket' should use WebSocketTransport")
+    void testWebSocketTransportSelection() {
+        MystiSqlConnection conn = new MystiSqlConnection(
+            "localhost", 8080, "test", "user", "token", 30, false, true, 10, "websocket"
+        );
+        
+        assertTrue(conn.getTransport() instanceof WebSocketTransport);
+    }
+
+    @Test
+    @DisplayName("getTransport should return Transport interface")
+    void testGetTransport() {
+        assertNotNull(connection.getTransport());
+    }
+
+    @Test
+    @DisplayName("getRestClient should return null when using WebSocket")
+    void testGetRestClientNullForWebSocket() {
+        MystiSqlConnection wsConn = new MystiSqlConnection(
+            "localhost", 8080, "test", "user", "token", 30, false, true, 10, "ws"
+        );
+        
+        assertNull(wsConn.getRestClient());
+    }
+
+    @Test
+    @DisplayName("getRestClient should return RestClient when using HTTP")
+    @SuppressWarnings("deprecation")
+    void testGetRestClientForHttp() {
+        MystiSqlConnection httpConn = new MystiSqlConnection(
+            "localhost", 8080, "test", "user", "token", 30, false, true, 10, "http"
+        );
+        
+        assertNotNull(httpConn.getRestClient());
+        assertTrue(httpConn.getRestClient() instanceof RestClient);
     }
 }

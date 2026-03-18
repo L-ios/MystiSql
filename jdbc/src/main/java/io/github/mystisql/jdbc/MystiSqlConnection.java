@@ -50,7 +50,9 @@ public class MystiSqlConnection implements Connection {
         String protocol = ssl ? "https" : "http";
         String baseUrl = String.format("%s://%s:%d", protocol, host, port);
         
-        this.transportType = transportType != null ? transportType.toLowerCase() : "ws";
+        // 默认使用 HTTP 传输，向后兼容
+        // 可通过 URL 参数 transport=ws 切换到 WebSocket
+        this.transportType = transportType != null ? transportType.toLowerCase() : "http";
         
         if ("http".equals(this.transportType)) {
             this.transport = new RestClient(baseUrl, token, timeout);

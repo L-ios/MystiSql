@@ -10,13 +10,28 @@ import {
   Typography,
   Tag,
   message,
+  Select,
+  Tooltip,
+  Badge,
 } from 'antd'
-import { SearchOutlined, ReloadOutlined } from '@ant-design/icons'
+import {
+  SearchOutlined,
+  ReloadOutlined,
+  WarningOutlined,
+} from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { apiClient, AuditLog } from '../api'
 
 const { Title } = Typography
 const { RangePicker } = DatePicker
+
+const queryTypeOptions = [
+  { value: 'SELECT', label: 'SELECT' },
+  { value: 'INSERT', label: 'INSERT' },
+  { value: 'UPDATE', label: 'UPDATE' },
+  { value: 'DELETE', label: 'DELETE' },
+  { value: 'DDL', label: 'DDL (CREATE/ALTER/DROP)' },
+]
 
 export default function AuditLogs() {
   const [loading, setLoading] = useState(false)
@@ -34,6 +49,8 @@ export default function AuditLogs() {
     instance?: string
     startTime?: string
     endTime?: string
+    sensitive?: boolean
+    queryType?: string
   }) => {
     setLoading(true)
     try {
@@ -57,10 +74,18 @@ export default function AuditLogs() {
 
   const handleSearch = () => {
     const values = form.getFieldsValue()
-    const params: Record<string, string> = {}
+    const params: Record<string, string | boolean | undefined> = {}
     
     if (values.userId) params.userId = values.userId
     if (values.instance) params.instance = values.instance
+    if (values.sensitive !== undefined) params.sensitive = values.sensitive
+    if (values.queryType) {
+      if (values.queryType === 'DDL') {
+        params.queryType = 'DDL'
+      } else {
+        params.queryType = values.queryType
+      }
+    }
     if (values.timeRange && values.timeRange[0] && values.timeRange[1]) {
       params.startTime = values.timeRange[0].toISOString()
       params.endTime = values.timeRange[1].toISOString()
@@ -97,18 +122,48 @@ export default function AuditLogs() {
       width: 120,
     },
     {
+      title: '数据库',
+      dataIndex: 'database',
+      key: 'database',
+      width: 100,
+      render: (db: string) => db || '-',
+    },
+    {
       title: 'SQL',
       dataIndex: 'sql',
       key: 'sql',
       ellipsis: true,
-      render: (sql: string) => (
-        <Typography.Text
-          style={{ fontFamily: 'monospace', fontSize: 12 }}
-          ellipsis={{ tooltip: sql }}
-        >
-          {sql}
-        </Typography.Text>
+      render: (sql: string, record: AuditLog) => (
+        <Space>
+          {record.sensitive && (
+            <Tooltip title="敏感操作">
+              <WarningOutlined style={{ color: '#ff4d4f', marginRight: 4 }} />
+            </Tooltip>
+          )}
+          <Typography.Text
+            style={{ fontFamily: 'monospace', fontSize: 12 }}
+            ellipsis={{ tooltip: sql }}
+          >
+            {sql}
+          </Typography.Text>
+        </Space>
       ),
+    },
+    {
+      title: '类型',
+      dataIndex: 'queryType',
+      key: 'queryType',
+      width: 100,
+      render: (type: string) => {
+        if (!type) return '-'
+        const colorMap: Record<string, string> = {
+          SELECT: 'blue',
+          INSERT: 'green',
+          UPDATE: 'orange',
+          DELETE: 'red',
+        }
+        return <Tag color={colorMap[type] || 'default'}>{type}</Tag>
+      },
     },
     {
       title: '耗时',
@@ -128,11 +183,18 @@ export default function AuditLogs() {
       dataIndex: 'success',
       key: 'success',
       width: 80,
-      render: (success: boolean) => (
-        <Tag color={success ? 'success' : 'error'}>
-          {success ? '成功' : '失败'}
-        </Tag>
-      ),
+      render: (success: boolean, record: AuditLog) => {
+        if (record.sensitive) {
+          return (
+            <Badge status="warning" text="敏感" />
+          )
+        }
+        return (
+          <Tag color={success ? 'success' : 'error'}>
+            {success ? '成功' : '失败'}
+          </Tag>
+        )
+      },
     },
     {
       title: '错误信息',
@@ -164,6 +226,25 @@ export default function AuditLogs() {
           <Form.Item name="instance" label="实例">
             <Input placeholder="输入实例名" style={{ width: 150 }} />
           </Form.Item>
+          <Form.Item name="queryType" label="SQL 类型">
+            <Select
+              style={{ width: 150 }}
+              placeholder="选择类型"
+              options={queryTypeOptions}
+              allowClear
+            />
+          </Form.Item>
+          <Form.Item name="sensitive" label="敏感操作">
+            <Select
+              style={{ width: 120 }}
+              placeholder="全部"
+              options={[
+                { value: true, label: '仅敏感' },
+                { value: false, label: '非敏感' },
+              ]}
+              allowClear
+            />
+          </Form.Item>
           <Form.Item name="timeRange" label="时间范围">
             <RangePicker showTime style={{ width: 350 }} />
           </Form.Item>
@@ -188,7 +269,7 @@ export default function AuditLogs() {
         <Table
           dataSource={logs}
           columns={columns}
-          rowKey="id"
+          rowKey={(record, index) => `log-${index}-${record.timestamp}`}
           loading={loading}
           pagination={{
             ...pagination,
@@ -199,8 +280,19 @@ export default function AuditLogs() {
             onChange: (page, pageSize) =>
               setPagination({ current: page, pageSize }),
           }}
-          scroll={{ x: 1200 }}
+          scroll={{ x: 1400 }}
+          rowClassName={(record: AuditLog) => 
+            record.sensitive ? 'sensitive-row' : ''
+          }
         />
+        <style>{`
+          .sensitive-row {
+            background-color: #fff7e6;
+          }
+          .sensitive-row:hover > td {
+            background-color: #fff1cc !important;
+          }
+        `}</style>
       </Card>
     </div>
   )

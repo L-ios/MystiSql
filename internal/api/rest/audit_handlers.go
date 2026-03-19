@@ -40,6 +40,8 @@ func (h *AuditHandlers) QueryLogs(c *gin.Context) {
 	}
 	userID := c.Query("user_id")
 	instance := c.Query("instance")
+	queryType := c.Query("query_type")
+	sensitiveStr := c.Query("sensitive")
 	pageStr := c.DefaultQuery("page", "1")
 	pageSizeStr := c.DefaultQuery("page_size", "100")
 
@@ -68,7 +70,15 @@ func (h *AuditHandlers) QueryLogs(c *gin.Context) {
 		}
 	}
 
-	logs, total, err := h.readLogs(startTime, endTime, userID, instance, page, pageSize)
+	var sensitive *bool
+	if sensitiveStr != "" {
+		s, err := strconv.ParseBool(sensitiveStr)
+		if err == nil {
+			sensitive = &s
+		}
+	}
+
+	logs, total, err := h.readLogs(startTime, endTime, userID, instance, queryType, sensitive, page, pageSize)
 	if err != nil {
 		h.logger.Error("Failed to read audit logs", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, NewErrorResponse(
@@ -90,7 +100,7 @@ func (h *AuditHandlers) QueryLogs(c *gin.Context) {
 	})
 }
 
-func (h *AuditHandlers) readLogs(startTime, endTime *time.Time, userID, instance string, page, pageSize int) ([]*audit.AuditLog, int, error) {
+func (h *AuditHandlers) readLogs(startTime, endTime *time.Time, userID, instance, queryType string, sensitive *bool, page, pageSize int) ([]*audit.AuditLog, int, error) {
 	file, err := os.Open(h.logFilePath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -130,6 +140,14 @@ func (h *AuditHandlers) readLogs(startTime, endTime *time.Time, userID, instance
 			continue
 		}
 
+		if queryType != "" && log.QueryType != queryType {
+			continue
+		}
+
+		if sensitive != nil && log.Sensitive != *sensitive {
+			continue
+		}
+
 		allLogs = append(allLogs, &log)
 	}
 
@@ -150,4 +168,132 @@ func (h *AuditHandlers) readLogs(startTime, endTime *time.Time, userID, instance
 	}
 
 	return allLogs[start:end], total, nil
+}
+
+// GetStats 获取审计日志统计信息
+func (h *AuditHandlers) GetStats(c *gin.Context) {
+	startTimeStr := c.Query("start")
+	endTimeStr := c.Query("end")
+
+	var startTime, endTime *time.Time
+	if startTimeStr != "" {
+		t, err := time.Parse(time.RFC3339, startTimeStr)
+		if err == nil {
+			startTime = &t
+		}
+	}
+
+	if endTimeStr != "" {
+		t, err := time.Parse(time.RFC3339, endTimeStr)
+		if err == nil {
+			endTime = &t
+		}
+	}
+
+	// 读取所有日志进行统计（限制时间范围内）
+	logs, _, err := h.readLogs(startTime, endTime, "", "", "", nil, 1, 10000)
+	if err != nil {
+		h.logger.Error("Failed to read audit logs for stats", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, NewErrorResponse(
+			"STATS_FAILED",
+			fmt.Sprintf("Failed to get audit stats: %v", err),
+		))
+		return
+	}
+
+	stats := h.calculateStats(logs)
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    stats,
+	})
+}
+
+func (h *AuditHandlers) calculateStats(logs []*audit.AuditLog) *audit.AuditStats {
+	stats := &audit.AuditStats{
+		QueryTypeDist: make(map[string]int64),
+		TopUsers:      []audit.UserStats{},
+		TopInstances:  []audit.InstanceStats{},
+	}
+
+	if len(logs) == 0 {
+		return stats
+	}
+
+	var totalExecTime int64
+	userCounts := make(map[string]int64)
+	instanceCounts := make(map[string]int64)
+	sensitiveCount := int64(0)
+	errorCount := int64(0)
+
+	for _, log := range logs {
+		stats.TotalQueries++
+		totalExecTime += log.ExecutionTime
+
+		if log.Status == "success" {
+			stats.SuccessCount++
+		} else if log.Status == "error" {
+			errorCount++
+		}
+
+		if log.Sensitive {
+			sensitiveCount++
+		}
+
+		if log.QueryType != "" {
+			stats.QueryTypeDist[log.QueryType]++
+		}
+
+		if log.UserID != "" {
+			userCounts[log.UserID]++
+		}
+
+		if log.Instance != "" {
+			instanceCounts[log.Instance]++
+		}
+	}
+
+	stats.ErrorCount = errorCount
+	stats.SensitiveCount = sensitiveCount
+	stats.AvgExecutionTime = totalExecTime / int64(len(logs))
+
+	// 计算Top用户（最多10个）
+	for userID, count := range userCounts {
+		stats.TopUsers = append(stats.TopUsers, audit.UserStats{
+			UserID: userID,
+			Count:  count,
+		})
+	}
+	// 按计数排序
+	for i := 0; i < len(stats.TopUsers); i++ {
+		for j := i + 1; j < len(stats.TopUsers); j++ {
+			if stats.TopUsers[j].Count > stats.TopUsers[i].Count {
+				stats.TopUsers[i], stats.TopUsers[j] = stats.TopUsers[j], stats.TopUsers[i]
+			}
+		}
+	}
+	if len(stats.TopUsers) > 10 {
+		stats.TopUsers = stats.TopUsers[:10]
+	}
+
+	// 计算Top实例（最多10个）
+	for instance, count := range instanceCounts {
+		stats.TopInstances = append(stats.TopInstances, audit.InstanceStats{
+			Instance: instance,
+			Count:    count,
+		})
+	}
+	// 按计数排序
+	for i := 0; i < len(stats.TopInstances); i++ {
+		for j := i + 1; j < len(stats.TopInstances); j++ {
+			if stats.TopInstances[j].Count > stats.TopInstances[i].Count {
+				stats.TopInstances[i], stats.TopInstances[j] = stats.TopInstances[j], stats.TopInstances[i]
+			}
+		}
+	}
+	if len(stats.TopInstances) > 10 {
+		stats.TopInstances = stats.TopInstances[:10]
+	}
+
+	return stats
 }

@@ -11,6 +11,7 @@ import type {
   InstanceHealthResponse,
   PoolStatsResponse,
   AuditLogsResponse,
+  AuditStatsResponse,
 } from './types'
 
 const API_BASE_URL = '/api/v1'
@@ -102,8 +103,20 @@ class ApiClient {
     endTime?: string
     page?: number
     pageSize?: number
+    sensitive?: boolean
+    queryType?: string
   }): Promise<AuditLogsResponse> {
     const response = await this.client.get<AuditLogsResponse>('/audit/logs', {
+      params,
+    })
+    return response.data
+  }
+
+  async getAuditStats(params?: {
+    startTime?: string
+    endTime?: string
+  }): Promise<AuditStatsResponse> {
+    const response = await this.client.get<AuditStatsResponse>('/audit/stats', {
       params,
     })
     return response.data

@@ -136,12 +136,61 @@ export interface AuditLog {
   id: string
   timestamp: string
   userId: string
+  clientIp?: string
   instance: string
-  sql: string
-  executionTime: number
+  database?: string
+  query: string
+  queryType?: string
+  executionTime?: number
   rowsAffected: number
   success: boolean
+  sensitive?: boolean
   errorMessage?: string
+}
+
+export interface AuditStats {
+  totalQueries: number
+  successCount: number
+  errorCount: number
+  sensitiveCount: number
+  avgExecutionTime: number
+  topUsers: Array<{ userId: string; count: number }>
+  topInstances: Array<{ instance: string; count: number }>
+  queryTypeDistribution: Record<string, number>
+}
+
+export interface AuditLogsResponse {
+  success: boolean
+  data?: {
+    total: number
+    logs: AuditLog[]
+  }
+  error?: {
+    code: string
+    message: string
+  }
+}
+
+
+
+export interface AuditStats {
+  totalQueries: number
+  successCount: number
+  errorCount: number
+  sensitiveCount: number
+  avgExecutionTime: number
+  topUsers: Array<{ userId: string; count: number }>
+  topInstances: Array<{ instance: string; count: number }>
+  queryTypeDistribution: Record<string, number>
+}
+
+export interface AuditStatsResponse {
+  success: boolean
+  data?: AuditStats
+  error?: {
+    code: string
+    message: string
+  }
 }
 
 export interface AuditLogsResponse {

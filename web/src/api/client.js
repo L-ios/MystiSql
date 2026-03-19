@@ -59,5 +59,11 @@ class ApiClient {
         });
         return response.data;
     }
+    async getAuditStats(params) {
+        const response = await this.client.get('/audit/stats', {
+            params,
+        });
+        return response.data;
+    }
 }
 export const apiClient = new ApiClient();

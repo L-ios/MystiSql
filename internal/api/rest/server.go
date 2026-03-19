@@ -234,6 +234,7 @@ func (s *Server) setupRoutes() {
 			auditGroup := v1.Group("/audit")
 			{
 				auditGroup.GET("/logs", s.auditHandlers.QueryLogs)
+				auditGroup.GET("/stats", s.auditHandlers.GetStats)
 			}
 		}
 	}

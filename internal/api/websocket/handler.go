@@ -252,7 +252,13 @@ func NewClientConnection(conn *websocket.Conn, userID, clientIP string, logger *
 }
 
 func (c *ClientConnection) ReadMessage() (int, []byte, error) {
-	return c.conn.ReadMessage()
+	messageType, data, err := c.conn.ReadMessage()
+	if err == nil {
+		c.mu.Lock()
+		c.lastActivity = time.Now()
+		c.mu.Unlock()
+	}
+	return messageType, data, err
 }
 
 func (c *ClientConnection) SendMessage(v interface{}) error {
@@ -263,7 +269,11 @@ func (c *ClientConnection) SendMessage(v interface{}) error {
 		return errors.New("connection closed")
 	}
 
-	return c.conn.WriteJSON(v)
+	if err := c.conn.WriteJSON(v); err != nil {
+		return err
+	}
+	c.lastActivity = time.Now()
+	return nil
 }
 
 func (c *ClientConnection) SendQueryResult(requestID string, result *types.QueryResult) error {

@@ -115,8 +115,22 @@ func (lw *LogWriter) drain() {
 
 	for len(lw.channel) > 0 {
 		log := <-lw.channel
-		if err := lw.writeLog(log); err != nil {
+		if lw.writer == nil {
+			break
+		}
+
+		data, err := json.Marshal(log)
+		if err != nil {
+			lw.logger.Error("Failed to marshal audit log during drain", zap.Error(err))
+			continue
+		}
+
+		if _, err := lw.writer.Write(data); err != nil {
 			lw.logger.Error("Failed to write audit log during drain", zap.Error(err))
+		}
+
+		if _, err := lw.writer.WriteString("\n"); err != nil {
+			lw.logger.Error("Failed to write newline during drain", zap.Error(err))
 		}
 	}
 

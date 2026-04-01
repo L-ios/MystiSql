@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"MystiSql/internal/connection"
 	"MystiSql/internal/discovery"
 	"MystiSql/internal/service/auth"
 	"MystiSql/internal/service/query"
@@ -25,7 +26,7 @@ func init() {
 func setupTestServer(t testing.TB) (*Server, *discovery.Registry) {
 	logger := zap.NewNop()
 	registry := discovery.NewRegistry()
-	engine := query.NewEngine(registry)
+	engine := query.NewEngine(registry, connection.GetRegistry())
 	authService, _ := auth.NewAuthService("test-secret-key", 24*time.Hour)
 
 	config := &types.ServerConfig{
@@ -34,7 +35,7 @@ func setupTestServer(t testing.TB) (*Server, *discovery.Registry) {
 		Mode: "debug",
 	}
 
-	server := NewServer(config, &types.WebUIConfig{Enabled: false, Mode: "embedded"}, registry, engine, authService, nil, nil, "", logger, "test-version")
+	server := NewServer(config, nil, &types.WebUIConfig{Enabled: false, Mode: "embedded"}, registry, engine, authService, nil, nil, "", logger, "test-version")
 
 	return server, registry
 }
@@ -82,7 +83,7 @@ func TestServerMode(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			logger := zap.NewNop()
 			registry := discovery.NewRegistry()
-			engine := query.NewEngine(registry)
+			engine := query.NewEngine(registry, connection.GetRegistry())
 			authService, _ := auth.NewAuthService("test-secret-key", 24*time.Hour)
 
 			config := &types.ServerConfig{
@@ -91,7 +92,7 @@ func TestServerMode(t *testing.T) {
 				Mode: tt.mode,
 			}
 
-			server := NewServer(config, &types.WebUIConfig{Enabled: false, Mode: "embedded"}, registry, engine, authService, nil, nil, "", logger, "test-version")
+			server := NewServer(config, nil, &types.WebUIConfig{Enabled: false, Mode: "embedded"}, registry, engine, authService, nil, nil, "", logger, "test-version")
 			if err := server.Setup(); err != nil {
 				t.Fatalf("设置服务器失败: %v", err)
 			}
@@ -134,6 +135,7 @@ func TestServerShutdown(t *testing.T) {
 		t.Fatalf("服务器初始化失败: %v", err)
 	}
 
+	server.server.Addr = "127.0.0.1:0"
 	go func() {
 		if err := server.Start(); err != nil && err != http.ErrServerClosed {
 			t.Logf("服务器启动错误: %v", err)
@@ -181,7 +183,7 @@ func TestServerAddress(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			logger := zap.NewNop()
 			registry := discovery.NewRegistry()
-			engine := query.NewEngine(registry)
+			engine := query.NewEngine(registry, connection.GetRegistry())
 			authService, _ := auth.NewAuthService("test-secret-key", 24*time.Hour)
 
 			config := &types.ServerConfig{
@@ -190,7 +192,7 @@ func TestServerAddress(t *testing.T) {
 				Mode: "debug",
 			}
 
-			server := NewServer(config, &types.WebUIConfig{Enabled: false, Mode: "embedded"}, registry, engine, authService, nil, nil, "", logger, "test-version")
+			server := NewServer(config, nil, &types.WebUIConfig{Enabled: false, Mode: "embedded"}, registry, engine, authService, nil, nil, "", logger, "test-version")
 			if err := server.Setup(); err != nil {
 				t.Fatalf("设置服务器失败: %v", err)
 			}
@@ -202,10 +204,28 @@ func TestServerAddress(t *testing.T) {
 	}
 }
 
+func TestRBACRouteRegistered(t *testing.T) {
+	server, _ := setupTestServer(t)
+
+	if err := server.Setup(); err != nil {
+		t.Fatalf("设置服务器失败: %v", err)
+	}
+
+	router := server.GetRouter()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/rbac/roles", nil)
+	req.Header.Set("Authorization", "Bearer invalid-token")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code == http.StatusNotFound {
+		t.Fatalf("expected RBAC route to be registered, got 404")
+	}
+}
+
 func TestVersion(t *testing.T) {
 	logger := zap.NewNop()
 	registry := discovery.NewRegistry()
-	engine := query.NewEngine(registry)
+	engine := query.NewEngine(registry, connection.GetRegistry())
 	authService, _ := auth.NewAuthService("test-secret-key", 24*time.Hour)
 
 	config := &types.ServerConfig{
@@ -215,7 +235,7 @@ func TestVersion(t *testing.T) {
 	}
 
 	version := "v1.0.0-test"
-	server := NewServer(config, &types.WebUIConfig{Enabled: false, Mode: "embedded"}, registry, engine, authService, nil, nil, "", logger, version)
+	server := NewServer(config, nil, &types.WebUIConfig{Enabled: false, Mode: "embedded"}, registry, engine, authService, nil, nil, "", logger, version)
 
 	if server.version != version {
 		t.Errorf("版本信息错误 got %v, want %v", server.version, version)

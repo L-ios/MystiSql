@@ -13,7 +13,7 @@ const (
 )
 
 type Message struct {
-	RequestID string      `json:"request_id,omitempty"`
+	RequestID string      `json:"requestId,omitempty"`
 	Action    MessageType `json:"action"`
 	Instance  string      `json:"instance,omitempty"`
 	Query     string      `json:"query,omitempty"`
@@ -33,16 +33,16 @@ func ParseMessage(data []byte) (*Message, error) {
 }
 
 type QueryResultMessage struct {
-	RequestID     string                   `json:"request_id"`
+	RequestID     string                   `json:"requestId"`
 	Type          MessageType              `json:"type"`
 	Columns       []map[string]interface{} `json:"columns"`
 	Rows          []map[string]interface{} `json:"rows"`
-	RowCount      int                      `json:"row_count"`
-	ExecutionTime int64                    `json:"execution_time_ms"`
+	RowCount      int                      `json:"rowCount"`
+	ExecutionTime int64                    `json:"executionTimeMs"`
 }
 
 type ErrorMessage struct {
-	RequestID string      `json:"request_id,omitempty"`
+	RequestID string      `json:"requestId,omitempty"`
 	Type      MessageType `json:"type"`
 	Code      string      `json:"code"`
 	Message   string      `json:"message"`

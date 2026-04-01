@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"MystiSql/internal/config"
+	"MystiSql/internal/connection"
 	"MystiSql/internal/discovery"
 	"MystiSql/internal/discovery/static"
 	"MystiSql/internal/service/query"
@@ -118,7 +119,7 @@ func TestCompleteFlow(t *testing.T) {
 			t.Fatalf("注册实例失败: %v", err)
 		}
 
-		engine := query.NewEngine(registry)
+		engine := query.NewEngine(registry, connection.GetRegistry())
 		defer func() { _ = engine.Close() }()
 
 		instances, err := engine.ListInstances()
@@ -170,7 +171,7 @@ func TestErrorHandling(t *testing.T) {
 
 	t.Run("查询引擎实例不存在", func(t *testing.T) {
 		registry := discovery.NewRegistry()
-		engine := query.NewEngine(registry)
+		engine := query.NewEngine(registry, connection.GetRegistry())
 		defer func() { _ = engine.Close() }()
 
 		ctx := context.Background()
@@ -245,7 +246,7 @@ func TestTimeoutHandling(t *testing.T) {
 			t.Fatalf("注册实例失败: %v", err)
 		}
 
-		engine := query.NewEngine(registry)
+		engine := query.NewEngine(registry, connection.GetRegistry())
 		defer func() { _ = engine.Close() }()
 
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)

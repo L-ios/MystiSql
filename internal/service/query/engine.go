@@ -7,9 +7,7 @@ import (
 	"time"
 
 	"MystiSql/internal/connection"
-	"MystiSql/internal/connection/mysql"
 	"MystiSql/internal/connection/pool"
-	"MystiSql/internal/connection/postgresql"
 	"MystiSql/internal/discovery"
 	"MystiSql/internal/service/audit"
 	"MystiSql/internal/service/validator"
@@ -21,22 +19,18 @@ type Engine struct {
 	registry         discovery.InstanceRegistry
 	parser           SQLParser
 	pools            map[string]connection.ConnectionPool
-	factories        map[types.DatabaseType]connection.ConnectionFactory
+	driverRegistry   *connection.DriverRegistry
 	auditService     *audit.AuditService
 	validatorService *validator.ValidatorService
 	mu               sync.RWMutex
 }
 
-func NewEngine(registry discovery.InstanceRegistry) *Engine {
-	factories := make(map[types.DatabaseType]connection.ConnectionFactory)
-	factories[types.DatabaseTypeMySQL] = mysql.NewFactory()
-	factories[types.DatabaseTypePostgreSQL] = postgresql.NewFactory()
-
+func NewEngine(registry discovery.InstanceRegistry, driverReg *connection.DriverRegistry) *Engine {
 	return &Engine{
-		registry:  registry,
-		parser:    NewParser(),
-		pools:     make(map[string]connection.ConnectionPool),
-		factories: factories,
+		registry:       registry,
+		parser:         NewParser(),
+		pools:          make(map[string]connection.ConnectionPool),
+		driverRegistry: driverReg,
 	}
 }
 
@@ -130,36 +124,72 @@ func (e *Engine) ExecuteQuery(ctx context.Context, instanceName, query string) (
 }
 
 func (e *Engine) ExecuteExec(ctx context.Context, instanceName, query string) (*types.ExecResult, error) {
-	// 解析 SQL 语句
 	parseResult, err := e.parser.Parse(query)
 	if err != nil {
 		return nil, fmt.Errorf("解析 SQL 语句失败: %w", err)
 	}
 
-	// 验证 SQL 语句
 	if err := e.parser.Validate(query); err != nil {
 		return nil, fmt.Errorf("验证 SQL 语句失败: %w", err)
 	}
 
-	// 获取连接池
+	e.mu.RLock()
+	validatorSvc := e.validatorService
+	auditSvc := e.auditService
+	e.mu.RUnlock()
+
+	if validatorSvc != nil {
+		validationResult, err := validatorSvc.Validate(ctx, instanceName, query)
+		if err != nil {
+			return nil, fmt.Errorf("SQL 验证失败: %w", err)
+		}
+		if !validationResult.Allowed {
+			return nil, fmt.Errorf("SQL 被拦截: %s", validationResult.Reason)
+		}
+	}
+
 	pool, err := e.getConnectionPool(ctx, instanceName)
 	if err != nil {
 		return nil, err
 	}
 
-	// 添加查询超时
 	ctx, cancel := WithTimeout(ctx, parseResult.QueryTimeout)
 	defer cancel()
 
-	// 获取连接
 	conn, err := pool.GetConnection(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("获取数据库连接失败: %w", err)
 	}
 	defer conn.Close()
 
-	// 执行语句
+	startTime := time.Now()
 	result, err := conn.Exec(ctx, query)
+
+	if auditSvc != nil {
+		auditLog := audit.NewAuditLog(
+			getUserIDFromContext(ctx),
+			getClientIPFromContext(ctx),
+			instanceName,
+			"",
+			query,
+		)
+		var rowsAffected int64
+		if result != nil {
+			rowsAffected = result.RowsAffected
+		}
+		auditLog.SetQueryInfo(string(parseResult.StatementType), rowsAffected, time.Since(startTime).Milliseconds())
+
+		if err != nil {
+			auditLog.SetError(err.Error())
+		} else {
+			auditLog.SetSuccess()
+		}
+
+		if logErr := auditSvc.Log(ctx, auditLog); logErr != nil {
+			// 审计日志写入失败不影响查询结果
+		}
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("执行语句失败: %w", err)
 	}
@@ -200,9 +230,9 @@ func (e *Engine) getConnectionPool(ctx context.Context, instanceName string) (co
 	}
 
 	// 获取连接工厂
-	factory, exists := e.factories[instance.Type]
-	if !exists {
-		return nil, fmt.Errorf("不支持的数据库类型: %s", instance.Type)
+	factory, err := e.driverRegistry.GetFactory(instance.Type)
+	if err != nil {
+		return nil, fmt.Errorf("不支持的数据库类型: %s: %w", instance.Type, err)
 	}
 
 	// 创建连接池配置

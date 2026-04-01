@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -41,26 +42,35 @@ var authTokenCmd = &cobra.Command{
 		}
 
 		client := &http.Client{Timeout: 30 * time.Second}
+
+		body, err := json.Marshal(map[string]string{
+			"user_id": userID,
+			"role":    role,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to marshal request body: %w", err)
+		}
+
 		resp, err := client.Post(
 			serverURL+"/api/v1/auth/token",
 			"application/json",
-			nil,
+			bytes.NewReader(body),
 		)
 		if err != nil {
 			return fmt.Errorf("请求服务器失败: %w", err)
 		}
 		defer resp.Body.Close()
 
-		body, err := io.ReadAll(resp.Body)
+		respBody, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return fmt.Errorf("读取响应失败: %w", err)
 		}
 
 		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("生成 Token 失败: %s", string(body))
+			return fmt.Errorf("生成 Token 失败: %s", string(respBody))
 		}
 
-		fmt.Println(string(body))
+		fmt.Println(string(respBody))
 		return nil
 	},
 }

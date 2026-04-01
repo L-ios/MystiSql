@@ -259,17 +259,12 @@ func (p *Parser) parseTables(sql string, statementType SQLStatementType) []strin
 		}
 
 	case StatementTypeUpdate:
-		// 查找 UPDATE 关键字后的表名
-		updateIndex := strings.Index(lowerSQL, " update ")
-		if updateIndex != -1 {
-			// 提取 UPDATE 后的表名
-			updateClause := lowerSQL[updateIndex+8:]
-			// 查找 SET 子句
-			setIndex := strings.Index(updateClause, " set ")
-			if setIndex != -1 {
-				tableClause := strings.TrimSpace(updateClause[:setIndex])
-				tables = append(tables, tableClause)
-			}
+		updateClause := strings.TrimPrefix(lowerSQL, "update")
+		updateClause = strings.TrimSpace(updateClause)
+		setIndex := strings.Index(updateClause, " set ")
+		if setIndex != -1 {
+			tableClause := strings.TrimSpace(updateClause[:setIndex])
+			tables = append(tables, tableClause)
 		}
 
 	case StatementTypeDelete:

@@ -152,149 +152,155 @@ func (p *ConnectionPoolImpl) createConnection() (*connectionWrapper, error) {
 }
 
 func (p *ConnectionPoolImpl) GetConnection(ctx context.Context) (connection.Connection, error) {
-	start := time.Now()
+	const maxRetries = 3
 
-	p.mu.Lock()
-	if p.closed {
-		p.mu.Unlock()
-		return nil, fmt.Errorf("connection pool is closed")
-	}
+	for retry := 0; retry < maxRetries; retry++ {
+		start := time.Now()
 
-	p.stats.AcquireCount++
-	p.mu.Unlock()
-
-	var waitStart time.Time
-
-	select {
-	case conn := <-p.idleConnections:
 		p.mu.Lock()
-		p.stats.ActiveConnections++
-		p.stats.IdleConnections--
+		if p.closed {
+			p.mu.Unlock()
+			return nil, fmt.Errorf("connection pool is closed")
+		}
+
+		p.stats.AcquireCount++
 		p.mu.Unlock()
 
-		if err := conn.conn.Ping(ctx); err != nil {
+		var waitStart time.Time
+
+		select {
+		case conn := <-p.idleConnections:
 			p.mu.Lock()
-			p.stats.AcquireFailed++
-			p.stats.ActiveConnections--
+			p.stats.ActiveConnections++
+			p.stats.IdleConnections--
 			p.mu.Unlock()
 
-			conn.conn.Close()
-			p.removeConnectionFromList(conn)
-
-			if p.metricsCollector != nil {
-				p.metricsCollector.RecordAcquire(p.instanceName, time.Since(start).Nanoseconds(), false)
-				p.metricsCollector.RecordConnectionClosed(p.instanceName)
-			}
-
-			return p.GetConnection(ctx)
-		}
-
-		conn.lastUsedAt = time.Now()
-
-		if p.metricsCollector != nil {
-			p.metricsCollector.RecordAcquire(p.instanceName, time.Since(start).Nanoseconds(), true)
-			p.metricsCollector.UpdatePoolStats(p.instanceName, &connection.PoolStats{
-				TotalConnections:  p.stats.TotalConnections,
-				IdleConnections:   p.stats.IdleConnections,
-				ActiveConnections: p.stats.ActiveConnections,
-				MaxConnections:    p.config.MaxConnections,
-				MinConnections:    p.config.MinConnections,
-			})
-		}
-
-		return conn, nil
-
-	default:
-		p.mu.Lock()
-		totalConnections := p.stats.TotalConnections
-		p.mu.Unlock()
-
-		if totalConnections >= p.config.MaxConnections {
-			waitStart = time.Now()
-
-			select {
-			case conn := <-p.idleConnections:
+			if err := conn.conn.Ping(ctx); err != nil {
 				p.mu.Lock()
-				p.stats.ActiveConnections++
-				p.stats.IdleConnections--
+				p.stats.AcquireFailed++
+				p.stats.ActiveConnections--
 				p.mu.Unlock()
 
-				if err := conn.conn.Ping(ctx); err != nil {
-					p.mu.Lock()
-					p.stats.AcquireFailed++
-					p.stats.ActiveConnections--
-					p.mu.Unlock()
-
-					conn.conn.Close()
-					p.removeConnectionFromList(conn)
-
-					if p.metricsCollector != nil {
-						p.metricsCollector.RecordAcquire(p.instanceName, time.Since(start).Nanoseconds(), false)
-						p.metricsCollector.RecordConnectionClosed(p.instanceName)
-					}
-
-					return p.GetConnection(ctx)
-				}
-
-				conn.lastUsedAt = time.Now()
+				conn.conn.Close()
+				p.removeConnectionFromList(conn)
 
 				if p.metricsCollector != nil {
-					p.metricsCollector.RecordWait(p.instanceName, time.Since(waitStart).Nanoseconds())
-					p.metricsCollector.RecordAcquire(p.instanceName, time.Since(start).Nanoseconds(), true)
-					p.metricsCollector.UpdatePoolStats(p.instanceName, &connection.PoolStats{
-						TotalConnections:  p.stats.TotalConnections,
-						IdleConnections:   p.stats.IdleConnections,
-						ActiveConnections: p.stats.ActiveConnections,
-						MaxConnections:    p.config.MaxConnections,
-						MinConnections:    p.config.MinConnections,
-					})
+					p.metricsCollector.RecordAcquire(p.instanceName, time.Since(start).Nanoseconds(), false)
+					p.metricsCollector.RecordConnectionClosed(p.instanceName)
 				}
 
-				return conn, nil
+				continue
+			}
 
-			case <-ctx.Done():
+			conn.lastUsedAt = time.Now()
+
+			if p.metricsCollector != nil {
+				p.metricsCollector.RecordAcquire(p.instanceName, time.Since(start).Nanoseconds(), true)
+				p.metricsCollector.UpdatePoolStats(p.instanceName, &connection.PoolStats{
+					TotalConnections:  p.stats.TotalConnections,
+					IdleConnections:   p.stats.IdleConnections,
+					ActiveConnections: p.stats.ActiveConnections,
+					MaxConnections:    p.config.MaxConnections,
+					MinConnections:    p.config.MinConnections,
+				})
+			}
+
+			return conn, nil
+
+		default:
+			p.mu.Lock()
+			totalConnections := p.stats.TotalConnections
+			p.mu.Unlock()
+
+			if totalConnections >= p.config.MaxConnections {
+				waitStart = time.Now()
+
+				select {
+				case conn := <-p.idleConnections:
+					p.mu.Lock()
+					p.stats.ActiveConnections++
+					p.stats.IdleConnections--
+					p.mu.Unlock()
+
+					if err := conn.conn.Ping(ctx); err != nil {
+						p.mu.Lock()
+						p.stats.AcquireFailed++
+						p.stats.ActiveConnections--
+						p.mu.Unlock()
+
+						conn.conn.Close()
+						p.removeConnectionFromList(conn)
+
+						if p.metricsCollector != nil {
+							p.metricsCollector.RecordAcquire(p.instanceName, time.Since(start).Nanoseconds(), false)
+							p.metricsCollector.RecordConnectionClosed(p.instanceName)
+						}
+
+						continue
+					}
+
+					conn.lastUsedAt = time.Now()
+
+					if p.metricsCollector != nil {
+						p.metricsCollector.RecordWait(p.instanceName, time.Since(waitStart).Nanoseconds())
+						p.metricsCollector.RecordAcquire(p.instanceName, time.Since(start).Nanoseconds(), true)
+						p.metricsCollector.UpdatePoolStats(p.instanceName, &connection.PoolStats{
+							TotalConnections:  p.stats.TotalConnections,
+							IdleConnections:   p.stats.IdleConnections,
+							ActiveConnections: p.stats.ActiveConnections,
+							MaxConnections:    p.config.MaxConnections,
+							MinConnections:    p.config.MinConnections,
+						})
+					}
+
+					return conn, nil
+
+				case <-ctx.Done():
+					p.mu.Lock()
+					p.stats.AcquireFailed++
+					p.mu.Unlock()
+
+					if p.metricsCollector != nil {
+						p.metricsCollector.RecordWait(p.instanceName, time.Since(waitStart).Nanoseconds())
+						p.metricsCollector.RecordAcquire(p.instanceName, time.Since(start).Nanoseconds(), false)
+					}
+
+					return nil, ctx.Err()
+				}
+			}
+
+			conn, err := p.createConnection()
+			if err != nil {
 				p.mu.Lock()
 				p.stats.AcquireFailed++
 				p.mu.Unlock()
 
 				if p.metricsCollector != nil {
-					p.metricsCollector.RecordWait(p.instanceName, time.Since(waitStart).Nanoseconds())
 					p.metricsCollector.RecordAcquire(p.instanceName, time.Since(start).Nanoseconds(), false)
 				}
 
-				return nil, ctx.Err()
+				return nil, err
 			}
-		}
 
-		conn, err := p.createConnection()
-		if err != nil {
 			p.mu.Lock()
-			p.stats.AcquireFailed++
+			p.stats.ActiveConnections++
 			p.mu.Unlock()
 
 			if p.metricsCollector != nil {
-				p.metricsCollector.RecordAcquire(p.instanceName, time.Since(start).Nanoseconds(), false)
+				p.metricsCollector.UpdatePoolStats(p.instanceName, &connection.PoolStats{
+					TotalConnections:  p.stats.TotalConnections,
+					IdleConnections:   p.stats.IdleConnections,
+					ActiveConnections: p.stats.ActiveConnections,
+					MaxConnections:    p.config.MaxConnections,
+					MinConnections:    p.config.MinConnections,
+				})
 			}
 
-			return nil, err
+			return conn, nil
 		}
-
-		p.mu.Lock()
-		p.stats.ActiveConnections++
-		p.mu.Unlock()
-
-		if p.metricsCollector != nil {
-			p.metricsCollector.UpdatePoolStats(p.instanceName, &connection.PoolStats{
-				TotalConnections:  p.stats.TotalConnections,
-				IdleConnections:   p.stats.IdleConnections,
-				ActiveConnections: p.stats.ActiveConnections,
-				MaxConnections:    p.config.MaxConnections,
-				MinConnections:    p.config.MinConnections,
-			})
-		}
-
-		return conn, nil
 	}
+
+	return nil, fmt.Errorf("failed to get connection after %d retries", maxRetries)
 }
 
 func (p *ConnectionPoolImpl) removeConnectionFromList(wrapper *connectionWrapper) {

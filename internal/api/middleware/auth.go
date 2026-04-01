@@ -62,6 +62,7 @@ func AuthMiddleware(authService *auth.AuthService, logger *zap.Logger) gin.Handl
 
 		c.Set("user_id", claims.UserID)
 		c.Set("role", claims.Role)
+		c.Set("roles", []string{claims.Role})
 		c.Set("token", token)
 
 		c.Next()

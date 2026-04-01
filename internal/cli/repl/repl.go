@@ -9,6 +9,12 @@ import (
 	"syscall"
 	"time"
 
+	"MystiSql/internal/connection"
+	"MystiSql/internal/connection/mysql"
+	"MystiSql/internal/connection/oracle"
+	"MystiSql/internal/connection/postgresql"
+	"MystiSql/internal/connection/redis"
+	"MystiSql/internal/connection/sqlite"
 	"MystiSql/internal/discovery"
 	"MystiSql/internal/service/query"
 	"MystiSql/pkg/types"
@@ -46,10 +52,17 @@ const (
 )
 
 func NewREPL(cfg *types.Config, reg discovery.InstanceRegistry) *REPL {
+	driverReg := connection.GetRegistry()
+	driverReg.RegisterDriver(types.DatabaseTypeMySQL, mysql.NewFactory())
+	driverReg.RegisterDriver(types.DatabaseTypePostgreSQL, postgresql.NewFactory())
+	driverReg.RegisterDriver(types.DatabaseTypeOracle, oracle.NewFactory())
+	driverReg.RegisterDriver(types.DatabaseTypeRedis, redis.NewFactory())
+	driverReg.RegisterDriver(types.DatabaseTypeSQLite, sqlite.NewFactory())
+
 	r := &REPL{
 		config:      cfg,
 		registry:    reg,
-		engine:      query.NewEngine(reg),
+		engine:      query.NewEngine(reg, driverReg),
 		inputBuffer: NewInputBuffer(),
 		history:     NewHistoryManager(),
 		formatter:   NewFormatter(),

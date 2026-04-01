@@ -9,10 +9,18 @@ import (
 	"time"
 
 	"MystiSql/internal/api/rest"
+	"MystiSql/internal/connection"
+	"MystiSql/internal/connection/mysql"
+	"MystiSql/internal/connection/oracle"
+	"MystiSql/internal/connection/postgresql"
+	"MystiSql/internal/connection/redis"
+	"MystiSql/internal/connection/sqlite"
 	"MystiSql/internal/service/audit"
 	"MystiSql/internal/service/auth"
+	"MystiSql/internal/service/health"
 	"MystiSql/internal/service/query"
 	"MystiSql/internal/service/validator"
+	"MystiSql/pkg/types"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -52,7 +60,14 @@ var serveCmd = &cobra.Command{
 		GetSugar().Info("MystiSql API 服务器启动中...")
 
 		// 创建 query engine
-		engine := query.NewEngine(GetRegistry())
+		driverReg := connection.GetRegistry()
+		driverReg.RegisterDriver(types.DatabaseTypeMySQL, mysql.NewFactory())
+		driverReg.RegisterDriver(types.DatabaseTypePostgreSQL, postgresql.NewFactory())
+		driverReg.RegisterDriver(types.DatabaseTypeOracle, oracle.NewFactory())
+		driverReg.RegisterDriver(types.DatabaseTypeRedis, redis.NewFactory())
+		driverReg.RegisterDriver(types.DatabaseTypeSQLite, sqlite.NewFactory())
+
+		engine := query.NewEngine(GetRegistry(), driverReg)
 
 		// 创建 auth service (如果启用)
 		var authService *auth.AuthService
@@ -98,10 +113,14 @@ var serveCmd = &cobra.Command{
 		}
 
 		// 创建并初始化 API 服务器
-		server := rest.NewServer(&cfg.Server, &cfg.WebUI, GetRegistry(), engine, authService, validatorService, auditService, auditLogFile, logger, Version)
+		server := rest.NewServer(&cfg.Server, &cfg.WebSocket, &cfg.WebUI, GetRegistry(), engine, authService, validatorService, auditService, auditLogFile, logger, Version)
 		if err := server.Setup(); err != nil {
 			return fmt.Errorf("初始化服务器失败: %w", err)
 		}
+
+		// 启动 Health Monitor
+		monitor := health.NewMonitor(GetRegistry(), engine, logger, 30*time.Second)
+		monitor.Start()
 
 		// 启动服务器（非阻塞）
 		if err := server.Start(); err != nil {
@@ -116,6 +135,8 @@ var serveCmd = &cobra.Command{
 		<-quit
 
 		GetSugar().Info("收到关闭信号，正在关闭服务器...")
+
+		monitor.Stop()
 
 		// 优雅关闭
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

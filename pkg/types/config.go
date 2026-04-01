@@ -115,6 +115,7 @@ type Config struct {
 	Discovery DiscoveryConfig  `json:"discovery" yaml:"discovery"`
 	Health    HealthConfig     `json:"health" yaml:"health"`
 	Pool      PoolConfig       `json:"pool" yaml:"pool"`
+	WebSocket WebSocketConfig  `json:"websocket" yaml:"websocket"`
 	WebUI     WebUIConfig      `json:"webui" yaml:"webui"`
 	Instances []InstanceConfig `json:"instances" yaml:"instances"`
 }
@@ -176,6 +177,12 @@ func NewConfig() *Config {
 			MaxLifetime:       "1h",
 			ConnectionTimeout: "10s",
 			PingInterval:      "30s",
+		},
+		WebSocket: WebSocketConfig{
+			Enabled:              true,
+			MaxConnections:       100,
+			IdleTimeout:          "5m",
+			MaxConcurrentQueries: 5,
 		},
 		WebUI: WebUIConfig{
 			Enabled: true,

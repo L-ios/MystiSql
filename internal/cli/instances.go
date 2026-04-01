@@ -95,7 +95,7 @@ var instancesHealthCmd = &cobra.Command{
 		instanceName := args[0]
 
 		// 创建 query engine
-		engine := query.NewEngine(GetRegistry())
+		engine := query.NewEngine(GetRegistry(), connection.GetRegistry())
 
 		// 创建带超时的上下文
 		ctx, cancel := context.WithTimeout(GetContext(), 10*time.Second)
@@ -129,7 +129,7 @@ var instancesPoolCmd = &cobra.Command{
 		instanceName := args[0]
 
 		// 创建 query engine
-		engine := query.NewEngine(GetRegistry())
+		engine := query.NewEngine(GetRegistry(), connection.GetRegistry())
 
 		// 获取连接池统计信息
 		stats, err := engine.GetPoolStats(instanceName)

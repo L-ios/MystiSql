@@ -117,7 +117,7 @@ func TestE2EWebSocket_Query(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, "req-001", result["requestId"])
-		assert.True(t, result["success"].(bool))
+		assert.Equal(t, "query_result", result["type"])
 	})
 
 	t.Run("ping pong", func(t *testing.T) {
@@ -135,7 +135,7 @@ func TestE2EWebSocket_Query(t *testing.T) {
 		err = json.Unmarshal(message, &result)
 		require.NoError(t, err)
 
-		assert.Equal(t, "pong", result["action"])
+		assert.Equal(t, "pong", result["type"])
 	})
 }
 
@@ -187,6 +187,6 @@ func TestE2EWebSocket_Error(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, "req-err-001", result["requestId"])
-		assert.False(t, result["success"].(bool))
+		assert.Equal(t, "error", result["type"])
 	})
 }

@@ -1,10 +1,8 @@
-go.sum
 .idea
 /bin/
 /coverage.out
 /rest.test
 /batch.test
-/coverage.out
 /e2e-*
 /session-*.md
 logs
@@ -12,3 +10,5 @@ test.txt
 web/dist
 package-lock.json
 web/node_modules
+.sisyphus/
+go.sum

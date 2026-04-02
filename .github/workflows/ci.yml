@@ -59,4 +59,4 @@ jobs:
 
       - name: Build and test
         working-directory: jdbc
-        run: chmod +x gradlew && ./gradlew build
+        run: chmod +x gradlew && ./gradlew build --no-daemon

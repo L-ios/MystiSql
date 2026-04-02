@@ -65,7 +65,7 @@ jobs:
           java-version: '21'
 
       - name: Build JDBC shaded JAR
-        run: cd jdbc && chmod +x gradlew && ./gradlew shadowJar
+        run: cd jdbc && chmod +x gradlew && ./gradlew shadowJar --no-daemon
 
       - name: Upload JDBC artifact
         uses: actions/upload-artifact@v4

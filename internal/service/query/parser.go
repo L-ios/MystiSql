@@ -145,9 +145,9 @@ func (p *Parser) Validate(sql string) error {
 	}
 
 	// 检查是否包含注释
-	if strings.Contains(lowerSQL, "--") || strings.Contains(lowerSQL, "/*") {
-		// 简单检查，实际应用中可能需要更复杂的处理
-	}
+	// TODO: implement comment detection
+	_ = strings.Contains(lowerSQL, "--")
+	_ = strings.Contains(lowerSQL, "/*")
 
 	return nil
 }
@@ -355,15 +355,7 @@ func (p *Parser) estimateResultSize(sql string, statementType SQLStatementType) 
 	lowerSQL := strings.ToLower(sql)
 	limitIndex := strings.Index(lowerSQL, " limit ")
 	if limitIndex != -1 {
-		// 提取 LIMIT 子句的值
-		limitClause := lowerSQL[limitIndex+7:]
-		// 查找分号
-		semicolonIndex := strings.Index(limitClause, ";")
-		if semicolonIndex != -1 {
-			limitClause = limitClause[:semicolonIndex]
-		}
-		// 简单处理，实际应用中可能需要解析数字
-		return 100 // 默认估计值
+		return 100
 	}
 
 	// 检查是否包含 WHERE 子句

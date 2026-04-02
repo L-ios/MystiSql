@@ -17,12 +17,12 @@ import (
 
 // MockConnection implements connection.Connection interface
 type MockConnection struct {
-	beginCount    int
-	commitCount   int
-	rollbackCount int
-	execCount     int
-	closed        bool
-	mu            sync.Mutex
+	_         int
+	_         int
+	_         int
+	execCount int
+	closed    bool
+	mu        sync.Mutex
 }
 
 func (m *MockConnection) Connect(ctx context.Context) error {

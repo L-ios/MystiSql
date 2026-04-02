@@ -11,4 +11,3 @@ web/dist
 package-lock.json
 web/node_modules
 .sisyphus/
-go.sum

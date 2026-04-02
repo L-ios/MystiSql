@@ -596,6 +596,7 @@ func (p *ConnectionPoolImpl) checkConnectionsHealth() {
 	}
 
 	idleConnCount := len(p.idleConnections)
+healthCheck:
 	for i := 0; i < idleConnCount; i++ {
 		select {
 		case conn := <-p.idleConnections:
@@ -651,7 +652,7 @@ func (p *ConnectionPoolImpl) checkConnectionsHealth() {
 			cancel()
 
 		default:
-			break
+			break healthCheck
 		}
 	}
 

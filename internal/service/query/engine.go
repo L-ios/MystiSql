@@ -109,9 +109,7 @@ func (e *Engine) ExecuteQuery(ctx context.Context, instanceName, query string) (
 			auditLog.SetSuccess()
 		}
 
-		if err := auditSvc.Log(ctx, auditLog); err != nil {
-			// Log the audit failure but don't fail the query
-		}
+		_ = auditSvc.Log(ctx, auditLog)
 	}
 
 	if err != nil {
@@ -185,9 +183,7 @@ func (e *Engine) ExecuteExec(ctx context.Context, instanceName, query string) (*
 			auditLog.SetSuccess()
 		}
 
-		if logErr := auditSvc.Log(ctx, auditLog); logErr != nil {
-			// 审计日志写入失败不影响查询结果
-		}
+		_ = auditSvc.Log(ctx, auditLog)
 	}
 
 	if err != nil {

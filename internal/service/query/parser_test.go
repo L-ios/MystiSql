@@ -492,7 +492,7 @@ func TestWithResultSizeLimit(t *testing.T) {
 
 	result := WithResultSizeLimit(smallResult, 10)
 	if result == nil {
-		t.Error("result should not be nil")
+		t.Fatal("result should not be nil")
 	}
 	if result.Truncated {
 		t.Error("should not be truncated when within limit")

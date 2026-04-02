@@ -2,19 +2,10 @@ package pool
 
 import (
 	"context"
-	"errors"
 	"testing"
 
-	"MystiSql/internal/connection"
 	"MystiSql/internal/connection/monitor"
-	"MystiSql/pkg/types"
 )
-
-type errorFactory struct{}
-
-func (f *errorFactory) CreateConnection(instance *types.DatabaseInstance) (connection.Connection, error) {
-	return nil, errors.New("factory error")
-}
 
 func TestNewConnectionPoolManagerNilConfig(t *testing.T) {
 	factory := &mockFactory{}

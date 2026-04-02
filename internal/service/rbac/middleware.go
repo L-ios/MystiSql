@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func (s *RBACService) PermissionMiddleware(required Permission) gin.HandlerFunc {
+func (r *RBACService) PermissionMiddleware(required Permission) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		rolesVal, exists := c.Get("roles")
 		if !exists {
@@ -18,7 +18,7 @@ func (s *RBACService) PermissionMiddleware(required Permission) gin.HandlerFunc 
 			c.AbortWithStatus(http.StatusForbidden)
 			return
 		}
-		if s.UserHasPermission(roles, required) {
+		if r.UserHasPermission(roles, required) {
 			c.Next()
 			return
 		}

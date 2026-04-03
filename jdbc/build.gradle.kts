@@ -39,7 +39,11 @@ dependencies {
 }
 
 tasks.test {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        excludeTags("integration")
+    }
+    maxParallelForks = 1
+    systemProperty("junit.jupiter.execution.timeout.default", "30s")
 }
 
 tasks.jar {

@@ -64,8 +64,18 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Build JDBC shaded JAR
-        run: cd jdbc && chmod +x gradlew && ./gradlew shadowJar --no-daemon
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Build and publish JDBC to GitHub Packages
+        working-directory: jdbc
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          chmod +x gradlew
+          ./gradlew shadowJar publish --no-daemon -Pversion=$VERSION
 
       - name: Upload JDBC artifact
         uses: actions/upload-artifact@v4

@@ -199,14 +199,23 @@ func (s *Server) setupRoutes() {
 	// API v1 路由组
 	v1 := s.router.Group("/api/v1")
 	{
-		// 认证相关端点（不需要认证）
+		// 公开认证端点（不需要认证）
 		if s.authHandlers != nil {
 			auth := v1.Group("/auth")
 			{
-				auth.POST("/token", s.authHandlers.GenerateToken)
-				auth.DELETE("/token", s.authHandlers.RevokeToken)
-				auth.GET("/tokens", s.authHandlers.ListTokens)
 				auth.POST("/token/info", s.authHandlers.GetTokenInfo)
+			}
+		}
+
+		// 需要管理员权限的认证端点
+		if s.authHandlers != nil && authMiddleware != nil {
+			adminAuth := v1.Group("/auth")
+			adminAuth.Use(authMiddleware)
+			adminAuth.Use(middleware.RequireRole("admin"))
+			{
+				adminAuth.POST("/token", s.authHandlers.GenerateToken)
+				adminAuth.DELETE("/token", s.authHandlers.RevokeToken)
+				adminAuth.GET("/tokens", s.authHandlers.ListTokens)
 			}
 		}
 

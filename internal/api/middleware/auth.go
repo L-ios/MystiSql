@@ -11,8 +11,7 @@ import (
 )
 
 var defaultWhitelistPaths = map[string]bool{
-	"/health":            true,
-	"/api/v1/auth/token": true,
+	"/health": true,
 }
 
 func AuthMiddleware(authService *auth.AuthService, logger *zap.Logger) gin.HandlerFunc {
@@ -117,6 +116,45 @@ func isWhitelisted(path string, whitelist map[string]bool) bool {
 	}
 
 	return false
+}
+
+// RequireRole 创建一个角色检查中间件，要求请求者具有指定的角色之一。
+// 必须在 AuthMiddleware 之后使用，因为依赖 context 中的 "role" 字段。
+func RequireRole(roles ...string) gin.HandlerFunc {
+	roleSet := make(map[string]bool, len(roles))
+	for _, r := range roles {
+		roleSet[r] = true
+	}
+
+	return func(c *gin.Context) {
+		role, exists := c.Get("role")
+		if !exists {
+			c.JSON(http.StatusForbidden, gin.H{
+				"success": false,
+				"error": gin.H{
+					"code":    "FORBIDDEN",
+					"message": "Access denied",
+				},
+			})
+			c.Abort()
+			return
+		}
+
+		roleStr, ok := role.(string)
+		if !ok || !roleSet[roleStr] {
+			c.JSON(http.StatusForbidden, gin.H{
+				"success": false,
+				"error": gin.H{
+					"code":    "FORBIDDEN",
+					"message": "Insufficient permissions",
+				},
+			})
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
 }
 
 func GetDefaultWhitelistPaths() []string {

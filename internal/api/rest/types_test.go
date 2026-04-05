@@ -54,7 +54,7 @@ func TestCORSMiddleware(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	router := gin.New()
-	router.Use(CORSMiddleware())
+	router.Use(CORSMiddleware(nil))
 	router.GET("/test", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})

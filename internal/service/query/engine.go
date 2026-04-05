@@ -316,13 +316,13 @@ func (e *Engine) GetParser() SQLParser {
 	return e.parser
 }
 
-func (e *Engine) GetPoolStats(instanceName string) (*connection.PoolStats, error) {
+func (e *Engine) GetPoolStats(ctx context.Context, instanceName string) (*connection.PoolStats, error) {
 	e.mu.RLock()
 	pool, exists := e.pools[instanceName]
 	e.mu.RUnlock()
 
 	if !exists {
-		_, err := e.getConnectionPool(context.Background(), instanceName)
+		_, err := e.getConnectionPool(ctx, instanceName)
 		if err != nil {
 			return nil, err
 		}

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 type AuthService struct {
@@ -28,6 +30,23 @@ func NewAuthService(secretKey string, tokenDuration time.Duration) (*AuthService
 	return &AuthService{
 		generator: generator,
 		blacklist: NewTokenBlacklist(),
+	}, nil
+}
+
+func NewAuthServiceWithConfig(secretKey string, tokenDuration time.Duration, cfg BlacklistConfig, logger *zap.Logger) (*AuthService, error) {
+	generator, err := NewTokenGenerator(secretKey, tokenDuration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create token generator: %w", err)
+	}
+
+	blacklist, err := NewTokenBlacklistWithConfig(cfg, logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create token blacklist: %w", err)
+	}
+
+	return &AuthService{
+		generator: generator,
+		blacklist: blacklist,
 	}, nil
 }
 
@@ -83,4 +102,8 @@ func (s *AuthService) GetTokenInfo(ctx context.Context, tokenString string) (*To
 
 func (s *AuthService) ListRevokedTokens(ctx context.Context) []*BlacklistItem {
 	return s.blacklist.GetAll()
+}
+
+func (s *AuthService) Close() {
+	s.blacklist.Stop()
 }

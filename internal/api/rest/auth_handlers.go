@@ -118,16 +118,22 @@ func (h *AuthHandlers) ListTokens(c *gin.Context) {
 }
 
 func (h *AuthHandlers) GetTokenInfo(c *gin.Context) {
-	token := c.Query("token")
-	if token == "" {
-		c.JSON(http.StatusBadRequest, NewErrorResponse(
-			"MISSING_TOKEN",
-			"Token parameter is required",
-		))
-		return
+	var req struct {
+		Token string `json:"token"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.Token == "" {
+		token := c.Query("token")
+		if token == "" {
+			c.JSON(http.StatusBadRequest, NewErrorResponse(
+				"MISSING_TOKEN",
+				"Token parameter is required",
+			))
+			return
+		}
+		req.Token = token
 	}
 
-	tokenInfo, err := h.authService.GetTokenInfo(c.Request.Context(), token)
+	tokenInfo, err := h.authService.GetTokenInfo(c.Request.Context(), req.Token)
 	if err != nil {
 		h.logger.Error("Failed to get token info", zap.Error(err))
 

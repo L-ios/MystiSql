@@ -407,7 +407,7 @@ func (h *Handlers) GetPoolStats(c *gin.Context) {
 	instanceName := c.Param("name")
 
 	// 获取连接池统计信息
-	stats, err := h.engine.GetPoolStats(instanceName)
+	stats, err := h.engine.GetPoolStats(c.Request.Context(), instanceName)
 	if err != nil {
 		h.logger.Error("Failed to get pool stats",
 			zap.String("instance", instanceName),

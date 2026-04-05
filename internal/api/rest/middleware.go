@@ -11,16 +11,34 @@ import (
 	"go.uber.org/zap"
 )
 
+// SecurityHeadersMiddleware 添加安全响应头
+// 防止 MIME 类型嗅探、点击劫持、XSS 攻击等常见安全威胁
+func SecurityHeadersMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.Header("X-Frame-Options", "DENY")
+		c.Header("X-XSS-Protection", "1; mode=block")
+		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
+		c.Next()
+	}
+}
+
 // CORSMiddleware 创建 CORS 中间件
-func CORSMiddleware() gin.HandlerFunc {
-	return cors.New(cors.Config{
-		AllowAllOrigins:  true,
+// allowedOrigins 为空时允许所有来源（向后兼容）
+func CORSMiddleware(allowedOrigins []string) gin.HandlerFunc {
+	config := cors.Config{
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With"},
 		ExposeHeaders:    []string{"Content-Length", "Content-Type"},
 		AllowCredentials: false,
 		MaxAge:           12 * time.Hour,
-	})
+	}
+	if len(allowedOrigins) > 0 {
+		config.AllowOrigins = allowedOrigins
+	} else {
+		config.AllowAllOrigins = true
+	}
+	return cors.New(config)
 }
 
 // LoggerMiddleware 创建日志中间件

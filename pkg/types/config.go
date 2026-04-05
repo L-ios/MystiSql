@@ -94,16 +94,23 @@ type ValidatorConfig struct {
 
 // WebSocketConfig 定义 WebSocket 配置
 type WebSocketConfig struct {
-	Enabled              bool   `json:"enabled" yaml:"enabled"`
-	MaxConnections       int    `json:"maxConnections" yaml:"maxConnections"`
-	IdleTimeout          string `json:"idleTimeout" yaml:"idleTimeout"`
-	MaxConcurrentQueries int    `json:"maxConcurrentQueries" yaml:"maxConcurrentQueries"`
+	Enabled              bool     `json:"enabled" yaml:"enabled"`
+	MaxConnections       int      `json:"maxConnections" yaml:"maxConnections"`
+	IdleTimeout          string   `json:"idleTimeout" yaml:"idleTimeout"`
+	MaxConcurrentQueries int      `json:"maxConcurrentQueries" yaml:"maxConcurrentQueries"`
+	AllowedOrigins       []string `json:"allowedOrigins" yaml:"allowedOrigins"`
+	MaxMessageSize       int64    `json:"maxMessageSize" yaml:"maxMessageSize"`
 }
 
 // WebUIConfig 定义 WebUI 配置
 type WebUIConfig struct {
 	Enabled bool   `json:"enabled" yaml:"enabled"`
 	Mode    string `json:"mode" yaml:"mode"` // embedded | external
+}
+
+// CORSConfig 定义 CORS 跨域配置
+type CORSConfig struct {
+	AllowedOrigins []string `json:"allowedOrigins" yaml:"allowedOrigins"`
 }
 
 // Config 定义应用程序的根配置
@@ -117,6 +124,7 @@ type Config struct {
 	Pool      PoolConfig       `json:"pool" yaml:"pool"`
 	WebSocket WebSocketConfig  `json:"websocket" yaml:"websocket"`
 	WebUI     WebUIConfig      `json:"webui" yaml:"webui"`
+	CORS      CORSConfig       `json:"cors" yaml:"cors"`
 	Instances []InstanceConfig `json:"instances" yaml:"instances"`
 }
 
@@ -183,6 +191,8 @@ func NewConfig() *Config {
 			MaxConnections:       100,
 			IdleTimeout:          "5m",
 			MaxConcurrentQueries: 5,
+			AllowedOrigins:       []string{},
+			MaxMessageSize:       1048576, // 1MB
 		},
 		WebUI: WebUIConfig{
 			Enabled: true,

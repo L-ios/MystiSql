@@ -132,7 +132,7 @@ var instancesPoolCmd = &cobra.Command{
 		engine := query.NewEngine(GetRegistry(), connection.GetRegistry())
 
 		// 获取连接池统计信息
-		stats, err := engine.GetPoolStats(instanceName)
+		stats, err := engine.GetPoolStats(cmd.Context(), instanceName)
 		if err != nil {
 			return fmt.Errorf("获取连接池统计信息失败: %w", err)
 		}

@@ -35,6 +35,7 @@ type Server struct {
 	config              *types.ServerConfig
 	websocketConfig     *types.WebSocketConfig
 	webuiConfig         *types.WebUIConfig
+	corsOrigins         []string
 	registry            discovery.InstanceRegistry
 	engine              *query.Engine
 	authService         *auth.AuthService
@@ -77,6 +78,11 @@ func NewServer(config *types.ServerConfig, websocketConfig *types.WebSocketConfi
 	}
 }
 
+// SetCORSOrigins 设置允许的 CORS 来源列表
+func (s *Server) SetCORSOrigins(origins []string) {
+	s.corsOrigins = origins
+}
+
 // Setup 初始化服务器
 // 配置 Gin 模式、路由和中间件
 func (s *Server) Setup() error {
@@ -106,6 +112,10 @@ func (s *Server) Setup() error {
 			cfg.MaxConnections = s.websocketConfig.MaxConnections
 			if idleTimeout, err := time.ParseDuration(s.websocketConfig.IdleTimeout); err == nil {
 				cfg.IdleTimeout = idleTimeout
+			}
+			cfg.AllowedOrigins = s.websocketConfig.AllowedOrigins
+			if s.websocketConfig.MaxMessageSize > 0 {
+				cfg.MaxMessageSize = s.websocketConfig.MaxMessageSize
 			}
 		}
 		s.wsHandler = wsapi.NewWebSocketHandler(s.engine, s.authService, s.logger, cfg)
@@ -149,9 +159,10 @@ func (s *Server) Setup() error {
 	}
 
 	// 添加中间件（顺序很重要）
-	s.router.Use(RecoveryMiddleware(s.logger)) // 错误恢复（最外层）
-	s.router.Use(LoggerMiddleware(s.logger))   // 日志记录
-	s.router.Use(CORSMiddleware())             // CORS 支持
+	s.router.Use(RecoveryMiddleware(s.logger))  // 错误恢复（最外层）
+	s.router.Use(SecurityHeadersMiddleware())   // 安全响应头
+	s.router.Use(LoggerMiddleware(s.logger))    // 日志记录
+	s.router.Use(CORSMiddleware(s.corsOrigins)) // CORS 支持
 
 	// 设置路由
 	s.setupRoutes()
@@ -195,7 +206,7 @@ func (s *Server) setupRoutes() {
 				auth.POST("/token", s.authHandlers.GenerateToken)
 				auth.DELETE("/token", s.authHandlers.RevokeToken)
 				auth.GET("/tokens", s.authHandlers.ListTokens)
-				auth.GET("/token/info", s.authHandlers.GetTokenInfo)
+				auth.POST("/token/info", s.authHandlers.GetTokenInfo)
 			}
 		}
 

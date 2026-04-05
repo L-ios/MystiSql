@@ -24,11 +24,12 @@ var (
 )
 
 type WebSocketHandler struct {
-	queryEngine *query.Engine
-	authService *auth.AuthService
-	connManager *ConnectionManager
-	logger      *zap.Logger
-	upgrader    websocket.Upgrader
+	queryEngine    *query.Engine
+	authService    *auth.AuthService
+	connManager    *ConnectionManager
+	logger         *zap.Logger
+	upgrader       websocket.Upgrader
+	maxMessageSize int64
 }
 
 type Config struct {
@@ -37,6 +38,8 @@ type Config struct {
 	ReadBufferSize    int
 	WriteBufferSize   int
 	EnableCompression bool
+	AllowedOrigins    []string
+	MaxMessageSize    int64
 }
 
 func DefaultConfig() *Config {
@@ -46,6 +49,7 @@ func DefaultConfig() *Config {
 		ReadBufferSize:    1024,
 		WriteBufferSize:   1024,
 		EnableCompression: false,
+		MaxMessageSize:    1048576, // 1MB
 	}
 }
 
@@ -59,16 +63,26 @@ func NewWebSocketHandler(queryEngine *query.Engine, authService *auth.AuthServic
 		WriteBufferSize:   config.WriteBufferSize,
 		EnableCompression: config.EnableCompression,
 		CheckOrigin: func(r *http.Request) bool {
-			return true
+			if len(config.AllowedOrigins) == 0 {
+				return true
+			}
+			origin := r.Header.Get("Origin")
+			for _, allowed := range config.AllowedOrigins {
+				if origin == allowed {
+					return true
+				}
+			}
+			return false
 		},
 	}
 
 	return &WebSocketHandler{
-		queryEngine: queryEngine,
-		authService: authService,
-		connManager: NewConnectionManager(config.MaxConnections, config.IdleTimeout, logger),
-		logger:      logger,
-		upgrader:    upgrader,
+		queryEngine:    queryEngine,
+		authService:    authService,
+		connManager:    NewConnectionManager(config.MaxConnections, config.IdleTimeout, logger),
+		logger:         logger,
+		upgrader:       upgrader,
+		maxMessageSize: config.MaxMessageSize,
 	}
 }
 
@@ -111,6 +125,10 @@ func (h *WebSocketHandler) Handle(c *gin.Context) {
 			zap.Error(err),
 		)
 		return
+	}
+
+	if h.maxMessageSize > 0 {
+		conn.SetReadLimit(h.maxMessageSize)
 	}
 
 	clientConn := NewClientConnection(conn, claims.UserID, c.ClientIP(), h.logger)

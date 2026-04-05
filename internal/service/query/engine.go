@@ -10,6 +10,7 @@ import (
 	"MystiSql/internal/connection/pool"
 	"MystiSql/internal/discovery"
 	"MystiSql/internal/service/audit"
+	"MystiSql/internal/service/masking"
 	"MystiSql/internal/service/validator"
 	"MystiSql/pkg/errors"
 	"MystiSql/pkg/types"
@@ -22,6 +23,7 @@ type Engine struct {
 	driverRegistry   *connection.DriverRegistry
 	auditService     *audit.AuditService
 	validatorService *validator.ValidatorService
+	maskingService   *masking.MaskingService
 	mu               sync.RWMutex
 }
 
@@ -46,6 +48,12 @@ func (e *Engine) SetValidatorService(service *validator.ValidatorService) {
 	e.validatorService = service
 }
 
+func (e *Engine) SetMaskingService(service *masking.MaskingService) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.maskingService = service
+}
+
 func (e *Engine) ExecuteQuery(ctx context.Context, instanceName, query string) (*types.QueryResult, error) {
 	startTime := time.Now()
 
@@ -61,6 +69,7 @@ func (e *Engine) ExecuteQuery(ctx context.Context, instanceName, query string) (
 	e.mu.RLock()
 	validatorSvc := e.validatorService
 	auditSvc := e.auditService
+	maskingSvc := e.maskingService
 	e.mu.RUnlock()
 
 	if validatorSvc != nil {
@@ -117,6 +126,12 @@ func (e *Engine) ExecuteQuery(ctx context.Context, instanceName, query string) (
 	}
 
 	result = WithResultSizeLimit(result, parseResult.MaxResultSize)
+
+	if maskingSvc != nil {
+		if role := getRoleFromContext(ctx); role != "" {
+			result = maskingSvc.MaskResult(role, result)
+		}
+	}
 
 	return result, nil
 }

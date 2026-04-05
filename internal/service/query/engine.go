@@ -3,6 +3,7 @@ package query
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"MystiSql/internal/discovery"
 	"MystiSql/internal/service/audit"
 	"MystiSql/internal/service/masking"
+	"MystiSql/internal/service/router"
 	"MystiSql/internal/service/validator"
 	"MystiSql/pkg/errors"
 	"MystiSql/pkg/types"
@@ -82,7 +84,11 @@ func (e *Engine) ExecuteQuery(ctx context.Context, instanceName, query string) (
 		}
 	}
 
-	pool, err := e.getConnectionPool(ctx, instanceName)
+	targetInstance, err := e.resolveInstance(ctx, instanceName, query)
+	if err != nil {
+		return nil, err
+	}
+	pool, err := e.getConnectionPool(ctx, targetInstance)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +167,11 @@ func (e *Engine) ExecuteExec(ctx context.Context, instanceName, query string) (*
 		}
 	}
 
-	pool, err := e.getConnectionPool(ctx, instanceName)
+	targetInstance, err := e.resolveInstance(ctx, instanceName, query)
+	if err != nil {
+		return nil, err
+	}
+	pool, err := e.getConnectionPool(ctx, targetInstance)
 	if err != nil {
 		return nil, err
 	}
@@ -329,6 +339,65 @@ func (e *Engine) GetInstanceHealth(ctx context.Context, instanceName string) (ty
 
 func (e *Engine) GetParser() SQLParser {
 	return e.parser
+}
+
+// resolveInstance determines the target instance based on SQL type and instance roles.
+// For write operations on a replica, it routes to the primary.
+// For read operations on a primary, it routes to an available replica.
+// When no role is configured or role is "readwrite", returns the requested instance unchanged.
+func (e *Engine) resolveInstance(ctx context.Context, requestedInstance, query string) (string, error) {
+	sqlType, inTxn, _ := router.ParseSQL(query)
+
+	instance, err := e.registry.GetInstance(requestedInstance)
+	if err != nil {
+		return "", fmt.Errorf("%w: %s", errors.ErrInstanceNotFound, requestedInstance)
+	}
+
+	if instance.Role == "" || instance.Role == "readwrite" {
+		return requestedInstance, nil
+	}
+
+	if inTxn {
+		if instance.Role == "replica" {
+			if instance.ReplicaOf == "" {
+				return "", fmt.Errorf("replica %s has no primary configured for transaction", requestedInstance)
+			}
+			return instance.ReplicaOf, nil
+		}
+		return requestedInstance, nil
+	}
+
+	if instance.Role == "replica" && sqlType.IsWrite() {
+		if instance.ReplicaOf == "" {
+			return "", fmt.Errorf("replica %s has no primary configured for write operation", requestedInstance)
+		}
+		return instance.ReplicaOf, nil
+	}
+
+	if instance.Role == "primary" && sqlType == router.SQLTypeSelect {
+		replicas := e.findReplicas(requestedInstance)
+		if len(replicas) > 0 {
+			return replicas[rand.Intn(len(replicas))], nil
+		}
+	}
+
+	return requestedInstance, nil
+}
+
+// findReplicas returns names of all replica instances whose ReplicaOf matches
+// the given primary instance name.
+func (e *Engine) findReplicas(primaryName string) []string {
+	instances, err := e.registry.ListInstances()
+	if err != nil {
+		return nil
+	}
+	var replicas []string
+	for _, inst := range instances {
+		if inst.Role == "replica" && inst.ReplicaOf == primaryName {
+			replicas = append(replicas, inst.Name)
+		}
+	}
+	return replicas
 }
 
 func (e *Engine) GetPoolStats(ctx context.Context, instanceName string) (*connection.PoolStats, error) {

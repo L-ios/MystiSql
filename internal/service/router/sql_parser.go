@@ -7,6 +7,9 @@ import (
 	"strings"
 )
 
+// beginRe is compiled once at package init for BEGIN keyword detection.
+var beginRe = regexp.MustCompile(`(?i)\bBEGIN\b`)
+
 // SQLType represents the type of an SQL statement.
 // Exported to allow downstream components (like the read-write router)
 // to branch logic based on the statement type.
@@ -42,6 +45,25 @@ func (t SQLType) String() string {
 	}
 }
 
+// IsWrite reports whether the SQLType represents a write operation.
+func (t SQLType) IsWrite() bool {
+	switch t {
+	case SQLTypeInsert, SQLTypeUpdate, SQLTypeDelete:
+		return true
+	default:
+		return false
+	}
+}
+
+// firstStatement extracts the first SQL statement from a potentially
+// multi-statement string by splitting on semicolons.
+func firstStatement(sql string) string {
+	if idx := strings.IndexByte(sql, ';'); idx >= 0 {
+		return strings.TrimSpace(sql[:idx])
+	}
+	return sql
+}
+
 // ParseSQL analyzes the provided SQL string and returns:
 // - the detected SQL type (SELECT/INSERT/UPDATE/DELETE/UNKNOWN)
 // - a boolean indicating whether the statement is inside or starts a transaction
@@ -51,7 +73,8 @@ func (t SQLType) String() string {
 // read-write router. They are not a full SQL parser, but cover the common cases
 // used in MystiSql routing.
 func ParseSQL(sql string) (SQLType, bool, bool) {
-	upper := strings.ToUpper(strings.TrimSpace(sql))
+	first := firstStatement(sql)
+	upper := strings.ToUpper(strings.TrimSpace(first))
 	var (
 		typ       SQLType
 		isTxnStmt bool
@@ -81,14 +104,11 @@ func ParseSQL(sql string) (SQLType, bool, bool) {
 	}
 
 	// Heuristic: consider inside-transaction if a boundary statement is present
-	// or if the text contains a BEGIN marker anywhere.
+	// or if the full text contains a BEGIN marker (using cached regex).
 	if isTxnStmt {
 		inTxn = true
-	} else {
-		re := regexp.MustCompile(`(?i)\bBEGIN\b`)
-		if re.MatchString(sql) {
-			inTxn = true
-		}
+	} else if beginRe.MatchString(sql) {
+		inTxn = true
 	}
 
 	return typ, inTxn, isTxnStmt
@@ -108,6 +128,5 @@ func IsTransaction(sql string) bool {
 			return true
 		}
 	}
-	re := regexp.MustCompile(`(?i)\bBEGIN\b`)
-	return re.MatchString(sql)
+	return beginRe.MatchString(sql)
 }

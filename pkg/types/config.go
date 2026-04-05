@@ -2,14 +2,16 @@ package types
 
 // InstanceConfig 定义单个数据库实例的配置
 type InstanceConfig struct {
-	Name     string            `json:"name" yaml:"name"`
-	Type     DatabaseType      `json:"type" yaml:"type"`
-	Host     string            `json:"host" yaml:"host"`
-	Port     int               `json:"port" yaml:"port"`
-	Username string            `json:"username,omitempty" yaml:"username,omitempty"`
-	Password string            `json:"-" yaml:"password,omitempty"`
-	Database string            `json:"database,omitempty" yaml:"database,omitempty"`
-	Labels   map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name      string            `json:"name" yaml:"name"`
+	Type      DatabaseType      `json:"type" yaml:"type"`
+	Host      string            `json:"host" yaml:"host"`
+	Port      int               `json:"port" yaml:"port"`
+	Username  string            `json:"username,omitempty" yaml:"username,omitempty"`
+	Password  string            `json:"-" yaml:"password,omitempty"`
+	Database  string            `json:"database,omitempty" yaml:"database,omitempty"`
+	Labels    map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Role      string            `json:"role,omitempty" yaml:"role,omitempty"`           // primary, replica, readwrite (default)
+	ReplicaOf string            `json:"replicaOf,omitempty" yaml:"replicaOf,omitempty"` // Name of primary instance
 }
 
 // ToDatabaseInstance 将 InstanceConfig 转换为 DatabaseInstance
@@ -23,6 +25,13 @@ func (c *InstanceConfig) ToDatabaseInstance() *DatabaseInstance {
 
 	if c.Labels != nil {
 		instance.Labels = c.Labels
+	}
+
+	if c.Role != "" {
+		instance.Role = c.Role
+	}
+	if c.ReplicaOf != "" {
+		instance.ReplicaOf = c.ReplicaOf
 	}
 
 	return instance

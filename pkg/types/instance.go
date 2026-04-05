@@ -43,6 +43,10 @@ type DatabaseInstance struct {
 	// 状态信息
 	Status InstanceStatus `json:"status" yaml:"status"` // 实例状态
 
+	// 路由信息
+	Role      string `json:"role,omitempty" yaml:"role,omitempty"`           // primary, replica, readwrite (default)
+	ReplicaOf string `json:"replicaOf,omitempty" yaml:"replicaOf,omitempty"` // Name of primary instance
+
 	// 元数据
 	Labels      map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`           // 标签（K8s 风格）
 	Annotations map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"` // 注解

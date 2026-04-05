@@ -6,7 +6,6 @@ import type {
   QueryResponse,
   ExecRequest,
   ExecResponse,
-  GenerateTokenResponse,
   TokenInfoResponse,
   InstanceHealthResponse,
   PoolStatsResponse,
@@ -51,20 +50,44 @@ class ApiClient {
     )
   }
 
-  async login(userId: string, role: string): Promise<GenerateTokenResponse> {
-    const response = await this.client.post<GenerateTokenResponse>(
-      '/auth/token',
-      { user_id: userId, role }
+  async getTokenInfo(token: string): Promise<TokenInfoResponse> {
+    const response = await this.client.post<TokenInfoResponse>(
+      '/auth/token/info',
+      { token }
     )
     return response.data
   }
 
-  async getTokenInfo(token: string): Promise<TokenInfoResponse> {
-    const response = await this.client.get<TokenInfoResponse>(
-      '/auth/token/info',
-      { params: { token } }
-    )
-    return response.data
+  async verifyAndLogin(token: string): Promise<{
+    success: boolean
+    userId?: string
+    role?: string
+    expiresAt?: string
+    error?: string
+  }> {
+    try {
+      const response = await this.client.post<TokenInfoResponse>(
+        '/auth/token/info',
+        { token }
+      )
+      if (response.data.success) {
+        return {
+          success: true,
+          userId: response.data.userId,
+          role: response.data.role,
+          expiresAt: response.data.expiresAt,
+        }
+      }
+      return {
+        success: false,
+        error: response.data.error?.message || 'Token 验证失败',
+      }
+    } catch (error: unknown) {
+      const axiosError = error as AxiosError<{ error?: { message?: string } }>
+      const msg =
+        axiosError.response?.data?.error?.message || 'Token 验证失败'
+      return { success: false, error: msg }
+    }
   }
 
   async getInstances(): Promise<InstancesListResponse> {

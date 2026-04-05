@@ -1,14 +1,12 @@
 import { useState } from 'react'
 import { Form, Input, Button, Card, message, Typography } from 'antd'
-import { UserOutlined, LockOutlined } from '@ant-design/icons'
 import { useAuthStore } from '../stores/authStore'
 import { apiClient } from '../api'
 
-const { Title } = Typography
+const { Title, Text } = Typography
 
 interface LoginForm {
-  userId: string
-  role: string
+  token: string
 }
 
 export default function Login() {
@@ -19,22 +17,17 @@ export default function Login() {
   const handleSubmit = async (values: LoginForm) => {
     setLoading(true)
     try {
-      const response = await apiClient.login(values.userId, values.role)
-      if (response.success && response.data) {
-        const expiresAt = new Date(response.data.expiresAt).getTime()
-        setAuth(
-          response.data.token,
-          response.data.userId,
-          response.data.role,
-          expiresAt
-        )
+      const result = await apiClient.verifyAndLogin(values.token)
+      if (result.success && result.userId && result.role && result.expiresAt) {
+        const expiresAt = new Date(result.expiresAt).getTime()
+        setAuth(values.token, result.userId, result.role, expiresAt)
         message.success('登录成功')
         window.location.href = '/dashboard'
       } else {
-        message.error(response.error?.message || '登录失败')
+        message.error(result.error || 'Token 无效')
       }
     } catch {
-      message.error('登录请求失败，请检查网络连接')
+      message.error('验证请求失败，请检查网络连接')
     } finally {
       setLoading(false)
     }
@@ -55,35 +48,23 @@ export default function Login() {
           <Title level={2} style={{ marginBottom: 8 }}>
             MystiSql
           </Title>
-          <Typography.Text type="secondary">
+          <Text type="secondary">
             数据库访问网关
-          </Typography.Text>
+          </Text>
         </div>
         <Form
           form={form}
           onFinish={handleSubmit}
           layout="vertical"
-          initialValues={{ role: 'readonly' }}
         >
           <Form.Item
-            name="userId"
-            label="用户 ID"
-            rules={[{ required: true, message: '请输入用户 ID' }]}
+            name="token"
+            label="Token"
+            rules={[{ required: true, message: '请输入 Token' }]}
           >
-            <Input
-              prefix={<UserOutlined />}
-              placeholder="请输入用户 ID"
-              size="large"
-            />
-          </Form.Item>
-          <Form.Item
-            name="role"
-            label="角色"
-            rules={[{ required: true, message: '请输入角色' }]}
-          >
-            <Input
-              prefix={<LockOutlined />}
-              placeholder="请输入角色（如：admin、readonly）"
+            <Input.TextArea
+              placeholder="请输入 Token"
+              autoSize={{ minRows: 2, maxRows: 4 }}
               size="large"
             />
           </Form.Item>
@@ -95,16 +76,16 @@ export default function Login() {
               block
               size="large"
             >
-              登录
+              验证并登录
             </Button>
           </Form.Item>
         </Form>
-        <Typography.Text
+        <Text
           type="secondary"
           style={{ display: 'block', textAlign: 'center' }}
         >
-          使用 Token 认证登录
-        </Typography.Text>
+          使用 <code>mystisql auth bootstrap</code> 命令获取管理员 Token
+        </Text>
       </Card>
     </div>
   )

@@ -3,59 +3,46 @@ package validator
 import (
 	"context"
 	"regexp"
-	"strings"
 )
 
 type SQLValidatorImpl struct {
-	dangerousPatterns []*regexp.Regexp
+	tokenizer *sqlTokenizer
 }
 
 func NewSQLValidator() *SQLValidatorImpl {
-	patterns := []string{
-		`(?i)^\s*DROP\s+`,
-		`(?i)^\s*TRUNCATE\s+`,
-	}
-
-	compiledPatterns := make([]*regexp.Regexp, 0, len(patterns))
-	for _, pattern := range patterns {
-		re, err := regexp.Compile(pattern)
-		if err == nil {
-			compiledPatterns = append(compiledPatterns, re)
-		}
-	}
-
 	return &SQLValidatorImpl{
-		dangerousPatterns: compiledPatterns,
+		tokenizer: newSQLTokenizer(),
 	}
 }
 
 func (v *SQLValidatorImpl) Validate(ctx context.Context, instance, query string) (*ValidationResult, error) {
-	query = strings.TrimSpace(query)
+	statements := v.tokenizer.Tokenize(query)
 
-	for _, pattern := range v.dangerousPatterns {
-		if pattern.MatchString(query) {
+	for _, stmt := range statements {
+		switch stmt.Type {
+		case "DROP", "TRUNCATE":
 			return &ValidationResult{
 				Allowed:   false,
-				Reason:    "SQL query contains dangerous operation",
+				Reason:    "SQL query contains dangerous operation: " + stmt.Type,
 				RiskLevel: "HIGH",
 			}, nil
+		case "DELETE":
+			if !v.tokenizer.hasKeyword(stmt.Content, "WHERE") {
+				return &ValidationResult{
+					Allowed:   false,
+					Reason:    "DELETE operation without WHERE clause is not allowed",
+					RiskLevel: "HIGH",
+				}, nil
+			}
+		case "UPDATE":
+			if !v.tokenizer.hasKeyword(stmt.Content, "WHERE") {
+				return &ValidationResult{
+					Allowed:   false,
+					Reason:    "UPDATE operation without WHERE clause is not allowed",
+					RiskLevel: "HIGH",
+				}, nil
+			}
 		}
-	}
-
-	if v.isDeleteWithoutWhere(query) {
-		return &ValidationResult{
-			Allowed:   false,
-			Reason:    "DELETE operation without WHERE clause is not allowed",
-			RiskLevel: "HIGH",
-		}, nil
-	}
-
-	if v.isUpdateWithoutWhere(query) {
-		return &ValidationResult{
-			Allowed:   false,
-			Reason:    "UPDATE operation without WHERE clause is not allowed",
-			RiskLevel: "HIGH",
-		}, nil
 	}
 
 	return &ValidationResult{
@@ -66,46 +53,35 @@ func (v *SQLValidatorImpl) Validate(ctx context.Context, instance, query string)
 }
 
 func (v *SQLValidatorImpl) isDeleteWithoutWhere(query string) bool {
-	query = strings.TrimSpace(query)
-	if !strings.HasPrefix(strings.ToUpper(query), "DELETE") {
-		return false
+	statements := v.tokenizer.Tokenize(query)
+	for _, stmt := range statements {
+		if stmt.Type == "DELETE" {
+			return !v.tokenizer.hasKeyword(stmt.Content, "WHERE")
+		}
 	}
-
-	return !strings.Contains(strings.ToUpper(query), "WHERE")
+	return false
 }
 
 func (v *SQLValidatorImpl) isUpdateWithoutWhere(query string) bool {
-	query = strings.TrimSpace(query)
-	if !strings.HasPrefix(strings.ToUpper(query), "UPDATE") {
-		return false
+	statements := v.tokenizer.Tokenize(query)
+	for _, stmt := range statements {
+		if stmt.Type == "UPDATE" {
+			return !v.tokenizer.hasKeyword(stmt.Content, "WHERE")
+		}
 	}
-
-	return !strings.Contains(strings.ToUpper(query), "WHERE")
+	return false
 }
 
 func (v *SQLValidatorImpl) GetQueryType(query string) string {
-	query = strings.TrimSpace(query)
-	upperQuery := strings.ToUpper(query)
-
-	if strings.HasPrefix(upperQuery, "SELECT") || strings.HasPrefix(upperQuery, "SHOW") {
-		return "SELECT"
-	} else if strings.HasPrefix(upperQuery, "INSERT") {
-		return "INSERT"
-	} else if strings.HasPrefix(upperQuery, "UPDATE") {
-		return "UPDATE"
-	} else if strings.HasPrefix(upperQuery, "DELETE") {
-		return "DELETE"
-	} else if strings.HasPrefix(upperQuery, "CREATE") {
-		return "CREATE"
-	} else if strings.HasPrefix(upperQuery, "ALTER") {
-		return "ALTER"
-	} else if strings.HasPrefix(upperQuery, "DROP") {
-		return "DROP"
-	} else if strings.HasPrefix(upperQuery, "TRUNCATE") {
-		return "TRUNCATE"
+	statements := v.tokenizer.Tokenize(query)
+	if len(statements) == 0 {
+		return "UNKNOWN"
 	}
-
-	return "UNKNOWN"
+	stmtType := statements[0].Type
+	if stmtType == "SHOW" {
+		return "SELECT"
+	}
+	return stmtType
 }
 
 type WhitelistManagerImpl struct {

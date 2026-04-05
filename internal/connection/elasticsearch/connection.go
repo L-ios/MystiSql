@@ -2,7 +2,9 @@ package elasticsearch
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -74,18 +76,70 @@ func (c *Connection) Query(ctx context.Context, query string) (*types.QueryResul
 	if err != nil {
 		return nil, fmt.Errorf("%w: search failed: %v", errors.ErrQueryFailed, err)
 	}
-	defer res.Body.Close()
 
-	if res.IsError() {
-		return nil, fmt.Errorf("%w: search error: %s", errors.ErrQueryFailed, res.String())
+	// Read the entire body before closing so the caller can access the data.
+	bodyBytes, readErr := io.ReadAll(res.Body)
+	res.Body.Close()
+	if readErr != nil {
+		return nil, fmt.Errorf("%w: read response body failed: %v", errors.ErrQueryFailed, readErr)
 	}
 
-	var resultRows []types.Row
-	resultRows = append(resultRows, types.Row{res.Body})
+	if res.IsError() {
+		return nil, fmt.Errorf("%w: search error: %s", errors.ErrQueryFailed, string(bodyBytes))
+	}
 
-	columnInfos := []types.ColumnInfo{{Name: "response", Type: "json"}}
+	return parseSearchResponse(bodyBytes, time.Since(start))
+}
 
-	return types.NewQueryResult(columnInfos, resultRows, time.Since(start)), nil
+// esSearchResponse maps the relevant fields of an Elasticsearch search response.
+type esSearchResponse struct {
+	Hits struct {
+		Total struct {
+			Value int `json:"value"`
+		} `json:"total"`
+		Hits []struct {
+			Source map[string]interface{} `json:"_source"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
+
+// parseSearchResponse converts raw ES JSON into a QueryResult.
+// Columns are derived from the first hit's _source keys; each _source becomes a row.
+// If there are no hits, an empty result set is returned.
+// If JSON parsing fails, the raw body is returned as a single-row fallback.
+func parseSearchResponse(body []byte, execTime time.Duration) (*types.QueryResult, error) {
+	var esResp esSearchResponse
+	if err := json.Unmarshal(body, &esResp); err != nil {
+		columns := []types.ColumnInfo{{Name: "response", Type: "json"}}
+		rows := []types.Row{{string(body)}}
+		return types.NewQueryResult(columns, rows, execTime), nil
+	}
+
+	hits := esResp.Hits.Hits
+	if len(hits) == 0 {
+		return types.NewQueryResult(nil, nil, execTime), nil
+	}
+
+	firstSource := hits[0].Source
+	columns := make([]types.ColumnInfo, 0, len(firstSource))
+	colIndex := make(map[string]int, len(firstSource))
+	for key := range firstSource {
+		colIndex[key] = len(columns)
+		columns = append(columns, types.ColumnInfo{Name: key, Type: "text"})
+	}
+
+	rows := make([]types.Row, 0, len(hits))
+	for _, hit := range hits {
+		row := make(types.Row, len(columns))
+		for key, val := range hit.Source {
+			if idx, ok := colIndex[key]; ok {
+				row[idx] = val
+			}
+		}
+		rows = append(rows, row)
+	}
+
+	return types.NewQueryResult(columns, rows, execTime), nil
 }
 
 func (c *Connection) Exec(ctx context.Context, query string) (*types.ExecResult, error) {

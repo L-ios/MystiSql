@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"MystiSql/internal/connection/base"
 	"MystiSql/pkg/types"
 )
 
@@ -73,17 +74,16 @@ func TestNewConnection(t *testing.T) {
 		t.Fatal("NewConnection() returned nil")
 	}
 
-	// 转换为具体类型以访问私有字段
 	mysqlConn, ok := conn.(*Connection)
 	if !ok {
 		t.Fatal("conn 不是 *Connection 类型")
 	}
 
-	if mysqlConn.instance != instance {
+	if mysqlConn.Instance() != instance {
 		t.Error("实例未正确设置")
 	}
 
-	if mysqlConn.db != nil {
+	if mysqlConn.DB() != nil {
 		t.Error("新连接的 db 应该为 nil")
 	}
 }
@@ -92,7 +92,6 @@ func TestConnection_Close_NotOpen(t *testing.T) {
 	instance := types.NewDatabaseInstance("test-mysql", types.DatabaseTypeMySQL, "localhost", 3306)
 	conn := NewConnection(instance)
 
-	// 测试关闭未打开的连接（幂等操作）
 	err := conn.Close()
 	if err != nil {
 		t.Errorf("关闭未打开的连接应该返回 nil，实际返回: %v", err)
@@ -103,7 +102,6 @@ func TestConnection_Ping_NotOpen(t *testing.T) {
 	instance := types.NewDatabaseInstance("test-mysql", types.DatabaseTypeMySQL, "localhost", 3306)
 	conn := NewConnection(instance)
 
-	// 测试 ping 未打开的连接
 	err := conn.Ping(context.Background())
 	if err == nil {
 		t.Error("ping 未打开的连接应该返回错误")
@@ -114,7 +112,6 @@ func TestConnection_Query_NotOpen(t *testing.T) {
 	instance := types.NewDatabaseInstance("test-mysql", types.DatabaseTypeMySQL, "localhost", 3306)
 	conn := NewConnection(instance)
 
-	// 测试查询未打开的连接
 	_, err := conn.Query(context.Background(), "SELECT 1")
 	if err == nil {
 		t.Error("查询未打开的连接应该返回错误")
@@ -125,39 +122,47 @@ func TestConnection_Exec_NotOpen(t *testing.T) {
 	instance := types.NewDatabaseInstance("test-mysql", types.DatabaseTypeMySQL, "localhost", 3306)
 	conn := NewConnection(instance)
 
-	// 测试执行未打开的连接
 	_, err := conn.Exec(context.Background(), "INSERT INTO test VALUES (1)")
 	if err == nil {
 		t.Error("执行未打开的连接应该返回错误")
 	}
 }
 
-// 注意：实际的连接测试需要真实的 MySQL 数据库
-// 以下测试需要测试数据库环境才能运行
+func TestConnection_EmbedsBase(t *testing.T) {
+	instance := types.NewDatabaseInstance("test-mysql", types.DatabaseTypeMySQL, "localhost", 3306)
+	conn := NewConnection(instance)
+
+	mysqlConn, ok := conn.(*Connection)
+	if !ok {
+		t.Fatal("conn 不是 *Connection 类型")
+	}
+
+	if mysqlConn.SQLConnection == nil {
+		t.Fatal("SQLConnection embed should not be nil")
+	}
+
+	cfg := base.DefaultPoolConfig()
+	if mysqlConn.SQLConnection.Instance() != instance {
+		t.Error("embedded SQLConnection should reference the same instance")
+	}
+
+	_ = cfg // pool config is used internally
+}
 
 func TestConnection_Connect_Real(t *testing.T) {
 	if testing.Short() {
 		t.Skip("跳过需要真实数据库的测试")
 	}
-
-	// TODO: 添加真实数据库连接测试
-	// 需要设置测试数据库环境
 }
 
 func TestConnection_Query_Real(t *testing.T) {
 	if testing.Short() {
 		t.Skip("跳过需要真实数据库的测试")
 	}
-
-	// TODO: 添加真实数据库查询测试
-	// 需要设置测试数据库环境
 }
 
 func TestConnection_ContextCancellation(t *testing.T) {
 	if testing.Short() {
 		t.Skip("跳过需要真实数据库的测试")
 	}
-
-	// TODO: 添加上下文取消测试
-	// 需要设置测试数据库环境
 }

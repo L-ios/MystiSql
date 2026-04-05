@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"MystiSql/internal/connection/pool"
 	"MystiSql/internal/service/transaction"
 	"MystiSql/pkg/types"
 
@@ -47,20 +48,22 @@ func DefaultBatchConfig() *BatchConfig {
 }
 
 type BatchService struct {
-	txManager *transaction.TransactionManager
-	config    *BatchConfig
-	logger    *zap.Logger
+	txManager   *transaction.TransactionManager
+	poolManager *pool.ConnectionPoolManager
+	config      *BatchConfig
+	logger      *zap.Logger
 }
 
-func NewBatchService(txManager *transaction.TransactionManager, config *BatchConfig, logger *zap.Logger) *BatchService {
+func NewBatchService(txManager *transaction.TransactionManager, poolManager *pool.ConnectionPoolManager, config *BatchConfig, logger *zap.Logger) *BatchService {
 	if config == nil {
 		config = DefaultBatchConfig()
 	}
 
 	return &BatchService{
-		txManager: txManager,
-		config:    config,
-		logger:    logger,
+		txManager:   txManager,
+		poolManager: poolManager,
+		config:      config,
+		logger:      logger,
 	}
 }
 
@@ -213,9 +216,27 @@ func (s *BatchService) executeSingleQuery(ctx context.Context, req *BatchRequest
 			result.RowsAffected = execResult.RowsAffected
 			result.LastInsertID = execResult.LastInsertID
 		}
+	} else if s.poolManager != nil {
+		conn, err := s.poolManager.GetConnection(ctx, req.Instance)
+		if err != nil {
+			result.Success = false
+			result.Error = fmt.Sprintf("failed to get connection: %v", err)
+		} else {
+			defer conn.Close()
+
+			execResult, execErr := conn.Exec(ctx, sql)
+			if execErr != nil {
+				result.Success = false
+				result.Error = execErr.Error()
+			} else {
+				result.Success = true
+				result.RowsAffected = execResult.RowsAffected
+				result.LastInsertID = execResult.LastInsertID
+			}
+		}
 	} else {
 		result.Success = false
-		result.Error = "non-transaction batch execution not yet implemented"
+		result.Error = "no connection available: neither transaction manager nor pool manager is configured"
 	}
 
 	result.ExecutionTime = time.Since(start).Milliseconds()

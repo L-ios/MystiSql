@@ -130,7 +130,7 @@ func TestNewBatchService(t *testing.T) {
 	txManager := &transaction.TransactionManager{}
 	config := DefaultBatchConfig()
 
-	service := NewBatchService(txManager, config, logger)
+	service := NewBatchService(txManager, nil, config, logger)
 
 	assert.NotNil(t, service)
 	assert.Equal(t, config, service.config)
@@ -148,7 +148,7 @@ func TestDefaultBatchConfig(t *testing.T) {
 
 func TestBatchService_ExecuteBatch_EmptyQueries(t *testing.T) {
 	logger := zap.NewNop()
-	service := NewBatchService(nil, nil, logger)
+	service := NewBatchService(nil, nil, nil, logger)
 
 	req := &BatchRequest{
 		Instance: "test-mysql",
@@ -166,7 +166,7 @@ func TestBatchService_ExecuteBatch_ExceedsMaxSize(t *testing.T) {
 	config := &BatchConfig{
 		MaxBatchSize: 2,
 	}
-	service := NewBatchService(nil, config, logger)
+	service := NewBatchService(nil, nil, config, logger)
 
 	req := &BatchRequest{
 		Instance: "test-mysql",
@@ -181,7 +181,23 @@ func TestBatchService_ExecuteBatch_ExceedsMaxSize(t *testing.T) {
 
 func TestBatchService_ExecuteBatch_NonTransaction(t *testing.T) {
 	logger := zap.NewNop()
-	service := NewBatchService(nil, nil, logger)
+	factory := NewMockConnectionFactory()
+
+	poolManager := pool.NewConnectionPoolManager(factory, nil)
+
+	instance := &types.DatabaseInstance{
+		Name:     "test-mysql",
+		Type:     "mysql",
+		Host:     "localhost",
+		Port:     3306,
+		Database: "testdb",
+		Username: "root",
+		Password: "password",
+	}
+	err := poolManager.AddInstance(instance)
+	require.NoError(t, err)
+
+	service := NewBatchService(nil, poolManager, nil, logger)
 
 	req := &BatchRequest{
 		Instance: "test-mysql",
@@ -193,8 +209,8 @@ func TestBatchService_ExecuteBatch_NonTransaction(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
 	assert.Len(t, response.Results, 1)
-	assert.False(t, response.Results[0].Success)
-	assert.Contains(t, response.Results[0].Error, "not yet implemented")
+	assert.True(t, response.Results[0].Success)
+	assert.Equal(t, int64(1), response.Results[0].RowsAffected)
 }
 
 func TestBatchService_ExecuteBatch_WithTransaction(t *testing.T) {
@@ -221,7 +237,7 @@ func TestBatchService_ExecuteBatch_WithTransaction(t *testing.T) {
 	tm := transaction.NewTransactionManager(poolManager, logger, nil)
 	defer tm.Close()
 
-	service := NewBatchService(tm, nil, logger)
+	service := NewBatchService(tm, nil, nil, logger)
 
 	// Begin transaction
 	tx, err := tm.BeginTransaction(context.Background(), "test-mysql", types.IsolationLevelDefault, "test-user")
@@ -273,7 +289,7 @@ func TestBatchService_ExecuteBatch_ContinueOnError(t *testing.T) {
 	tm := transaction.NewTransactionManager(poolManager, logger, nil)
 	defer tm.Close()
 
-	service := NewBatchService(tm, nil, logger)
+	service := NewBatchService(tm, nil, nil, logger)
 
 	// Begin transaction
 	tx, err := tm.BeginTransaction(context.Background(), "test-mysql", types.IsolationLevelDefault, "test-user")
@@ -324,7 +340,7 @@ func TestBatchService_ExecuteBatchWithNewTransaction_Success(t *testing.T) {
 	tm := transaction.NewTransactionManager(poolManager, logger, nil)
 	defer tm.Close()
 
-	service := NewBatchService(tm, nil, logger)
+	service := NewBatchService(tm, nil, nil, logger)
 
 	req := &BatchRequest{
 		Instance:    "test-mysql",
@@ -365,7 +381,7 @@ func TestBatchService_ExecuteBatchWithNewTransaction_Failure(t *testing.T) {
 	tm := transaction.NewTransactionManager(poolManager, logger, nil)
 	defer tm.Close()
 
-	service := NewBatchService(tm, nil, logger)
+	service := NewBatchService(tm, nil, nil, logger)
 
 	req := &BatchRequest{
 		Instance:    "test-mysql",
@@ -384,7 +400,7 @@ func TestBatchService_ExecuteBatchWithNewTransaction_Failure(t *testing.T) {
 
 func TestBatchService_ExecuteBatchWithNewTransaction_NoManager(t *testing.T) {
 	logger := zap.NewNop()
-	service := NewBatchService(nil, nil, logger)
+	service := NewBatchService(nil, nil, nil, logger)
 
 	req := &BatchRequest{
 		Instance: "test-mysql",
@@ -425,7 +441,7 @@ func TestBatchService_ExecuteBatch_Parallel(t *testing.T) {
 		Timeout:        5 * time.Minute,
 	}
 
-	service := NewBatchService(tm, config, logger)
+	service := NewBatchService(tm, nil, config, logger)
 
 	// Begin transaction - parallel execution doesn't work with transactions
 	// so this will still execute sequentially
@@ -452,7 +468,7 @@ func TestBatchService_ExecuteBatch_InvalidTransaction(t *testing.T) {
 	tm := transaction.NewTransactionManager(nil, logger, nil)
 	defer tm.Close()
 
-	service := NewBatchService(tm, nil, logger)
+	service := NewBatchService(tm, nil, nil, logger)
 
 	req := &BatchRequest{
 		Instance:      "test-mysql",

@@ -401,7 +401,7 @@ func (s *Server) initTransactionManager() error {
 	s.txManager = transaction.NewTransactionManager(s.poolManager, s.logger, nil)
 
 	// 创建批量操作服务
-	s.batchService = batch.NewBatchService(s.txManager, nil, s.logger)
+	s.batchService = batch.NewBatchService(s.txManager, s.poolManager, nil, s.logger)
 
 	// 创建事务处理器
 	s.transactionHandlers = NewTransactionHandlers(s.txManager, s.logger)

@@ -405,7 +405,7 @@ func TestValidateQuery_Allowed(t *testing.T) {
 
 func setupBatchTestRouter(t *testing.T) (*gin.Engine, *BatchHandlers) {
 	logger := zap.NewNop()
-	batchSvc := batch.NewBatchService(nil, batch.DefaultBatchConfig(), logger)
+	batchSvc := batch.NewBatchService(nil, nil, batch.DefaultBatchConfig(), logger)
 	handlers := NewBatchHandlers(batchSvc, logger)
 
 	router := gin.New()
@@ -416,7 +416,7 @@ func setupBatchTestRouter(t *testing.T) (*gin.Engine, *BatchHandlers) {
 
 func TestNewBatchHandlers(t *testing.T) {
 	logger := zap.NewNop()
-	batchSvc := batch.NewBatchService(nil, batch.DefaultBatchConfig(), logger)
+	batchSvc := batch.NewBatchService(nil, nil, batch.DefaultBatchConfig(), logger)
 	handlers := NewBatchHandlers(batchSvc, logger)
 
 	assert.NotNil(t, handlers)

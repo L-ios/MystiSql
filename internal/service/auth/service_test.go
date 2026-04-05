@@ -2,8 +2,11 @@ package auth
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 func TestNewTokenBlacklist(t *testing.T) {
@@ -272,5 +275,140 @@ func TestTokenInfo_Struct(t *testing.T) {
 	}
 	if info.TokenID != "abc123" {
 		t.Errorf("TokenID = %q", info.TokenID)
+	}
+}
+
+func TestNewAuthServiceWithConfig(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "blacklist.jsonl")
+	cfg := BlacklistConfig{
+		TTL:             time.Hour,
+		FilePath:        tmpFile,
+		CleanupInterval: time.Minute,
+	}
+	svc, err := NewAuthServiceWithConfig("secret-key-1234567890123456", 24*time.Hour, cfg, zap.NewNop())
+	if err != nil {
+		t.Fatalf("NewAuthServiceWithConfig error: %v", err)
+	}
+	defer svc.Close()
+
+	token, err := svc.GenerateToken(context.Background(), "user1", "admin")
+	if err != nil {
+		t.Fatalf("GenerateToken error: %v", err)
+	}
+
+	claims, err := svc.ValidateToken(context.Background(), token)
+	if err != nil {
+		t.Fatalf("ValidateToken error: %v", err)
+	}
+	if claims.UserID != "user1" {
+		t.Errorf("UserID = %q, want %q", claims.UserID, "user1")
+	}
+}
+
+func TestNewAuthServiceWithConfig_BadSecret(t *testing.T) {
+	cfg := BlacklistConfig{TTL: time.Hour}
+	_, err := NewAuthServiceWithConfig("", 24*time.Hour, cfg, zap.NewNop())
+	if err == nil {
+		t.Error("expected error for empty secret")
+	}
+}
+
+func TestNewAuthServiceWithConfig_BadFilePath(t *testing.T) {
+	cfg := BlacklistConfig{
+		TTL:             time.Hour,
+		FilePath:        "/nonexistent/dir/blacklist.jsonl",
+		CleanupInterval: time.Minute,
+	}
+	_, err := NewAuthServiceWithConfig("secret-key-1234567890123456", 24*time.Hour, cfg, zap.NewNop())
+	if err != nil {
+		t.Fatalf("should succeed even with bad file path: %v", err)
+	}
+}
+
+func TestAuthService_Close(t *testing.T) {
+	cfg := BlacklistConfig{
+		TTL:             time.Hour,
+		CleanupInterval: time.Minute,
+	}
+	svc, err := NewAuthServiceWithConfig("secret-key-1234567890123456", 24*time.Hour, cfg, zap.NewNop())
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+
+	token, err := svc.GenerateToken(context.Background(), "user1", "admin")
+	if err != nil {
+		t.Fatalf("GenerateToken error: %v", err)
+	}
+
+	svc.RevokeToken(context.Background(), token)
+	svc.Close()
+
+	if !svc.IsTokenRevoked(context.Background(), token) {
+		t.Error("token should still be revoked after Close")
+	}
+}
+
+func TestNewTokenGenerator_EmptySecret(t *testing.T) {
+	_, err := NewTokenGenerator("", time.Hour)
+	if err == nil {
+		t.Error("expected error for empty secret")
+	}
+}
+
+func TestNewTokenGenerator_ZeroDuration(t *testing.T) {
+	_, err := NewTokenGenerator("secret", 0)
+	if err == nil {
+		t.Error("expected error for zero duration")
+	}
+}
+
+func TestNewTokenGenerator_NegativeDuration(t *testing.T) {
+	_, err := NewTokenGenerator("secret", -time.Hour)
+	if err == nil {
+		t.Error("expected error for negative duration")
+	}
+}
+
+func TestGenerateToken_EmptyUserID(t *testing.T) {
+	gen, err := NewTokenGenerator("secret-key-1234567890123456", time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = gen.GenerateToken("", "admin")
+	if err == nil {
+		t.Error("expected error for empty user ID")
+	}
+}
+
+func TestGenerateToken_EmptyRole(t *testing.T) {
+	gen, err := NewTokenGenerator("secret-key-1234567890123456", time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = gen.GenerateToken("user1", "")
+	if err == nil {
+		t.Error("expected error for empty role")
+	}
+}
+
+func TestValidateToken_EmptyToken(t *testing.T) {
+	gen, err := NewTokenGenerator("secret-key-1234567890123456", time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = gen.ValidateToken("")
+	if err != ErrInvalidToken {
+		t.Errorf("error = %v, want ErrInvalidToken", err)
+	}
+}
+
+func TestValidateToken_WrongSigningMethod(t *testing.T) {
+	gen, err := NewTokenGenerator("secret-key-1234567890123456", time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = gen.ValidateToken("eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.sig")
+	if err == nil {
+		t.Error("expected error for wrong signing method")
 	}
 }

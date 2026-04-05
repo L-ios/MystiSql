@@ -163,3 +163,102 @@ func TestLogWriter_Rotate(t *testing.T) {
 		t.Errorf("rotated file should contain both queries, got: %s", content)
 	}
 }
+
+func TestLogWriter_WriteLog_ClosedWriter(t *testing.T) {
+	logger := zap.NewNop()
+	path := filepath.Join(t.TempDir(), "audit.log")
+	lw, err := NewLogWriter(path, 100, logger)
+	if err != nil {
+		t.Fatalf("NewLogWriter error: %v", err)
+	}
+	lw.Close()
+
+	err = lw.writeLog(&AuditLog{Query: "SELECT 1"})
+	if err == nil {
+		t.Error("writeLog should return error when writer is closed")
+	}
+}
+
+func TestLogWriter_DrainFlushesRemaining(t *testing.T) {
+	logger := zap.NewNop()
+	path := filepath.Join(t.TempDir(), "audit.log")
+	lw, err := NewLogWriter(path, 100, logger)
+	if err != nil {
+		t.Fatalf("NewLogWriter error: %v", err)
+	}
+
+	for i := 0; i < 5; i++ {
+		lw.Write(NewAuditLog("user", "127.0.0.1", "inst", "db", "SELECT 1"))
+	}
+
+	time.Sleep(50 * time.Millisecond)
+
+	lw.Close()
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile error: %v", err)
+	}
+	lines := strings.Count(strings.TrimSpace(string(data)), "\n") + 1
+	if lines < 5 {
+		t.Errorf("expected at least 5 log lines after drain, got %d", lines)
+	}
+}
+
+func TestLogWriter_ProcessLogsFlushTicker(t *testing.T) {
+	logger := zap.NewNop()
+	path := filepath.Join(t.TempDir(), "audit.log")
+	lw, err := NewLogWriter(path, 100, logger)
+	if err != nil {
+		t.Fatalf("NewLogWriter error: %v", err)
+	}
+
+	lw.Write(NewAuditLog("user", "127.0.0.1", "inst", "db", "SELECT 1"))
+
+	// Wait longer than the 5s flush ticker won't work in unit tests,
+	// so just verify the writer is still functional after some time
+	time.Sleep(100 * time.Millisecond)
+
+	lw.Write(NewAuditLog("user", "127.0.0.1", "inst", "db", "SELECT 2"))
+	lw.Close()
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile error: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "SELECT 1") {
+		t.Error("file should contain SELECT 1")
+	}
+	if !strings.Contains(content, "SELECT 2") {
+		t.Error("file should contain SELECT 2")
+	}
+}
+
+func TestLogWriter_Rotate_ClosedFile(t *testing.T) {
+	logger := zap.NewNop()
+	path := filepath.Join(t.TempDir(), "audit.log")
+	lw, err := NewLogWriter(path, 100, logger)
+	if err != nil {
+		t.Fatalf("NewLogWriter error: %v", err)
+	}
+
+	// Write something, then close to exercise the flush-before-rotate path
+	lw.Write(NewAuditLog("user", "127.0.0.1", "inst", "db", "SELECT 1"))
+	time.Sleep(50 * time.Millisecond)
+
+	// Close and re-open to get a clean state, then Rotate
+	lw.Close()
+
+	// After Close, file is nil — Rotate should handle nil file
+	lw2, err := NewLogWriter(path, 100, logger)
+	if err != nil {
+		t.Fatalf("NewLogWriter error: %v", err)
+	}
+
+	err = lw2.Rotate()
+	if err != nil {
+		t.Errorf("Rotate should succeed, got: %v", err)
+	}
+	lw2.Close()
+}

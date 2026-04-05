@@ -231,6 +231,56 @@ func TestAuditService_Disabled(t *testing.T) {
 	}
 }
 
+func TestAuditLog_IsSensitive(t *testing.T) {
+	log := &AuditLog{}
+	if log.IsSensitive() {
+		t.Error("should not be sensitive by default")
+	}
+	log.MarkSensitive()
+	if !log.IsSensitive() {
+		t.Error("should be sensitive after MarkSensitive")
+	}
+}
+
+func TestAuditLog_SetSessionID(t *testing.T) {
+	log := &AuditLog{}
+	log.SetSessionID("session-123")
+	if log.SessionID != "session-123" {
+		t.Errorf("SessionID = %q, want %q", log.SessionID, "session-123")
+	}
+}
+
+func TestAuditLog_SetUserAgent(t *testing.T) {
+	log := &AuditLog{}
+	log.SetUserAgent("Mozilla/5.0")
+	if log.UserAgent != "Mozilla/5.0" {
+		t.Errorf("UserAgent = %q, want %q", log.UserAgent, "Mozilla/5.0")
+	}
+}
+
+func TestNewAuditService_ZeroRetentionDays(t *testing.T) {
+	tmpFile := "/tmp/test-audit-zero-retention.log"
+	defer os.Remove(tmpFile)
+
+	logger := zap.NewNop()
+	config := &AuditConfig{
+		Enabled:       true,
+		LogFile:       tmpFile,
+		BufferSize:    100,
+		RetentionDays: 0,
+	}
+
+	service, err := NewAuditService(config, logger)
+	if err != nil {
+		t.Fatalf("NewAuditService error: %v", err)
+	}
+	defer service.Close()
+
+	if !service.IsEnabled() {
+		t.Error("service should be enabled")
+	}
+}
+
 func TestAuditService_EnableDisable(t *testing.T) {
 	logger := zap.NewNop()
 	config := &AuditConfig{

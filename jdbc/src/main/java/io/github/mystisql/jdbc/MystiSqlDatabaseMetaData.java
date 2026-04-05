@@ -1,6 +1,6 @@
 package io.github.mystisql.jdbc;
 
-import io.github.mystisql.jdbc.client.RestClient;
+import io.github.mystisql.jdbc.client.Transport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,8 +76,8 @@ public class MystiSqlDatabaseMetaData implements DatabaseMetaData {
         };
         
         try {
-            RestClient client = connection.getRestClient();
-            MystiSqlResultSet rs = client.executeQuery(
+            Transport transport = connection.getTransport();
+            MystiSqlResultSet rs = transport.executeQuery(
                 connection.getInstanceName(), 
                 "SELECT SCHEMA_NAME AS TABLE_CAT FROM INFORMATION_SCHEMA.SCHEMATA"
             );
@@ -112,8 +112,8 @@ public class MystiSqlDatabaseMetaData implements DatabaseMetaData {
                 sql.append(" AND SCHEMA_NAME LIKE '").append(escapePattern(schemaPattern)).append("'");
             }
             
-            RestClient client = connection.getRestClient();
-            return client.executeQuery(connection.getInstanceName(), sql.toString());
+            Transport transport = connection.getTransport();
+            return transport.executeQuery(connection.getInstanceName(), sql.toString());
         } catch (SQLException e) {
             logger.warn("Failed to query schemas, returning empty result", e);
             return new MystiSqlResultSet(columns, new Object[0][]);
@@ -174,8 +174,8 @@ public class MystiSqlDatabaseMetaData implements DatabaseMetaData {
             
             sql.append(" ORDER BY TABLE_TYPE, TABLE_SCHEMA, TABLE_NAME");
             
-            RestClient client = connection.getRestClient();
-            return client.executeQuery(connection.getInstanceName(), sql.toString());
+            Transport transport = connection.getTransport();
+            return transport.executeQuery(connection.getInstanceName(), sql.toString());
         } catch (SQLException e) {
             logger.warn("Failed to query tables, returning empty result", e);
             return new MystiSqlResultSet(columns, new Object[0][]);
@@ -282,8 +282,8 @@ public class MystiSqlDatabaseMetaData implements DatabaseMetaData {
             
             sql.append(" ORDER BY TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION");
             
-            RestClient client = connection.getRestClient();
-            return client.executeQuery(connection.getInstanceName(), sql.toString());
+            Transport transport = connection.getTransport();
+            return transport.executeQuery(connection.getInstanceName(), sql.toString());
         } catch (SQLException e) {
             logger.warn("Failed to query columns, returning empty result", e);
             return new MystiSqlResultSet(columns, new Object[0][]);
@@ -326,8 +326,8 @@ public class MystiSqlDatabaseMetaData implements DatabaseMetaData {
             
             sql.append(" ORDER BY TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION");
             
-            RestClient client = connection.getRestClient();
-            return client.executeQuery(connection.getInstanceName(), sql.toString());
+            Transport transport = connection.getTransport();
+            return transport.executeQuery(connection.getInstanceName(), sql.toString());
         } catch (SQLException e) {
             logger.warn("Failed to query primary keys, returning empty result", e);
             return new MystiSqlResultSet(columns, new Object[0][]);
@@ -389,8 +389,8 @@ public class MystiSqlDatabaseMetaData implements DatabaseMetaData {
             
             sql.append(" ORDER BY TABLE_SCHEMA, TABLE_NAME, NON_UNIQUE, INDEX_NAME, SEQ_IN_INDEX");
             
-            RestClient client = connection.getRestClient();
-            return client.executeQuery(connection.getInstanceName(), sql.toString());
+            Transport transport = connection.getTransport();
+            return transport.executeQuery(connection.getInstanceName(), sql.toString());
         } catch (SQLException e) {
             logger.warn("Failed to query index info, returning empty result", e);
             return new MystiSqlResultSet(columns, new Object[0][]);

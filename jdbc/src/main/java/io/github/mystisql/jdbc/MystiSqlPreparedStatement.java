@@ -3,7 +3,7 @@ package io.github.mystisql.jdbc;
 import io.github.mystisql.jdbc.client.ExecResult;
 import io.github.mystisql.jdbc.client.QueryParameter;
 import io.github.mystisql.jdbc.client.QueryRequest;
-import io.github.mystisql.jdbc.client.RestClient;
+import io.github.mystisql.jdbc.client.Transport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,9 +38,9 @@ public class MystiSqlPreparedStatement extends MystiSqlStatement implements Prep
         logger.debug("executeQuery (prepared): {}", sql);
         
         QueryRequest request = buildQueryRequest();
-        RestClient client = getConnection().getRestClient();
+        Transport transport = getConnection().getTransport();
         
-        return client.executeQuery(request);
+        return transport.executeQuery(request);
     }
     
     @Override
@@ -49,9 +49,9 @@ public class MystiSqlPreparedStatement extends MystiSqlStatement implements Prep
         logger.debug("executeUpdate (prepared): {}", sql);
         
         QueryRequest request = buildQueryRequest();
-        RestClient client = getConnection().getRestClient();
+        Transport transport = getConnection().getTransport();
         
-        ExecResult result = client.executeUpdate(request);
+        ExecResult result = transport.executeUpdate(request);
         
         int affectedRows = result.getRowsAffected() != null ? result.getRowsAffected().intValue() : 0;
         setUpdateCount(affectedRows, result.getRowsAffected() != null ? result.getRowsAffected() : 0L);

@@ -171,34 +171,9 @@ export interface AuditLogsResponse {
   }
 }
 
-
-
-export interface AuditStats {
-  totalQueries: number
-  successCount: number
-  errorCount: number
-  sensitiveCount: number
-  avgExecutionTime: number
-  topUsers: Array<{ userId: string; count: number }>
-  topInstances: Array<{ instance: string; count: number }>
-  queryTypeDistribution: Record<string, number>
-}
-
 export interface AuditStatsResponse {
   success: boolean
   data?: AuditStats
-  error?: {
-    code: string
-    message: string
-  }
-}
-
-export interface AuditLogsResponse {
-  success: boolean
-  data?: {
-    total: number
-    logs: AuditLog[]
-  }
   error?: {
     code: string
     message: string

@@ -1,7 +1,6 @@
 plugins {
     `java-library`
     `maven-publish`
-    id("com.gradleup.shadow") version "8.3.5"
 }
 
 group = "io.github.mystisql"
@@ -12,15 +11,23 @@ repositories {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
     withSourcesJar()
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
 }
 
 sourceSets {
     main {
         java {
             exclude("**/examples/**")
+        }
+    }
+    test {
+        java {
+            srcDirs("../e2e-test/jdbc")
         }
     }
 }

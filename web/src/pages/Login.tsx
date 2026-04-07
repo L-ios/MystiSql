@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Form, Input, Button, Card, message, Typography } from 'antd'
 import { UserOutlined, LockOutlined } from '@ant-design/icons'
 import { useAuthStore } from '../stores/authStore'
@@ -15,6 +16,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const setAuth = useAuthStore((state) => state.setAuth)
   const [form] = Form.useForm()
+  const navigate = useNavigate()
 
   const handleSubmit = async (values: LoginForm) => {
     setLoading(true)
@@ -29,7 +31,7 @@ export default function Login() {
           expiresAt
         )
         message.success('登录成功')
-        window.location.href = '/dashboard'
+        navigate('/dashboard')
       } else {
         message.error(response.error?.message || '登录失败')
       }
@@ -71,6 +73,7 @@ export default function Login() {
             rules={[{ required: true, message: '请输入用户 ID' }]}
           >
             <Input
+              data-testid="user-id-input"
               prefix={<UserOutlined />}
               placeholder="请输入用户 ID"
               size="large"
@@ -82,6 +85,7 @@ export default function Login() {
             rules={[{ required: true, message: '请输入角色' }]}
           >
             <Input
+              data-testid="role-input"
               prefix={<LockOutlined />}
               placeholder="请输入角色（如：admin、readonly）"
               size="large"
@@ -89,6 +93,7 @@ export default function Login() {
           </Form.Item>
           <Form.Item>
             <Button
+              data-testid="login-button"
               type="primary"
               htmlType="submit"
               loading={loading}

@@ -47,6 +47,11 @@ type DatabaseInstance struct {
 	Labels      map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`           // 标签（K8s 风格）
 	Annotations map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"` // 注解
 
+	// 高可用配置
+	Role   InstanceRole `json:"role" yaml:"role"`                         // 实例角色（master/slave）
+	Master string       `json:"master,omitempty" yaml:"master,omitempty"` // 关联的主库名称（从库专用）
+	Weight int          `json:"weight,omitempty" yaml:"weight,omitempty"` // 负载均衡权重
+
 	// 时间戳
 	CreatedAt time.Time `json:"createdAt" yaml:"createdAt"` // 创建时间
 	UpdatedAt time.Time `json:"updatedAt" yaml:"updatedAt"` // 更新时间
@@ -61,6 +66,8 @@ func NewDatabaseInstance(name string, dbType DatabaseType, host string, port int
 		Host:      host,
 		Port:      port,
 		Status:    InstanceStatusUnknown,
+		Role:      InstanceRoleMaster,
+		Weight:    1,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}

@@ -94,9 +94,18 @@ func (c *Connection) Exec(ctx context.Context, query string) (*types.ExecResult,
 
 	start := time.Now()
 
-	res, err := c.client.Index(c.index).BodyString(query).Do(ctx)
+	res, err := c.client.Index(
+		c.index,
+		strings.NewReader(query),
+		c.client.Index.WithContext(ctx),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("%w: index failed: %v", errors.ErrQueryFailed, err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return nil, fmt.Errorf("%w: index error: %s", errors.ErrQueryFailed, res.String())
 	}
 
 	return types.NewExecResult(1, 0, time.Since(start)), nil

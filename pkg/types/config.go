@@ -10,6 +10,11 @@ type InstanceConfig struct {
 	Password string            `json:"-" yaml:"password,omitempty"`
 	Database string            `json:"database,omitempty" yaml:"database,omitempty"`
 	Labels   map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+
+	// 高可用配置
+	Role   InstanceRole `json:"role,omitempty" yaml:"role,omitempty"`
+	Master string       `json:"master,omitempty" yaml:"master,omitempty"`
+	Weight int          `json:"weight,omitempty" yaml:"weight,omitempty"`
 }
 
 // ToDatabaseInstance 将 InstanceConfig 转换为 DatabaseInstance
@@ -24,6 +29,15 @@ func (c *InstanceConfig) ToDatabaseInstance() *DatabaseInstance {
 	if c.Labels != nil {
 		instance.Labels = c.Labels
 	}
+
+	// 设置高可用相关字段
+	if c.Role != "" {
+		instance.Role = c.Role
+	} else {
+		instance.Role = InstanceRoleMaster
+	}
+	instance.Master = c.Master
+	instance.Weight = c.Weight
 
 	return instance
 }
@@ -108,15 +122,17 @@ type WebUIConfig struct {
 
 // Config 定义应用程序的根配置
 type Config struct {
-	Server    ServerConfig     `json:"server" yaml:"server"`
-	Auth      AuthConfig       `json:"auth" yaml:"auth"`
-	Audit     AuditConfig      `json:"audit" yaml:"audit"`
-	Validator ValidatorConfig  `json:"validator" yaml:"validator"`
-	Discovery DiscoveryConfig  `json:"discovery" yaml:"discovery"`
-	Health    HealthConfig     `json:"health" yaml:"health"`
-	Pool      PoolConfig       `json:"pool" yaml:"pool"`
-	WebUI     WebUIConfig      `json:"webui" yaml:"webui"`
-	Instances []InstanceConfig `json:"instances" yaml:"instances"`
+	Server       ServerConfig       `json:"server" yaml:"server"`
+	Auth         AuthConfig         `json:"auth" yaml:"auth"`
+	Audit        AuditConfig        `json:"audit" yaml:"audit"`
+	Validator    ValidatorConfig    `json:"validator" yaml:"validator"`
+	Discovery    DiscoveryConfig    `json:"discovery" yaml:"discovery"`
+	Health       HealthConfig       `json:"health" yaml:"health"`
+	Pool         PoolConfig         `json:"pool" yaml:"pool"`
+	WebUI        WebUIConfig        `json:"webui" yaml:"webui"`
+	Instances    []InstanceConfig   `json:"instances" yaml:"instances"`
+	HA           HAConfig           `json:"ha" yaml:"ha"`
+	MultiCluster MultiClusterConfig `json:"multiCluster" yaml:"multiCluster"`
 }
 
 // NewConfig 创建一个带有默认值的配置
@@ -182,5 +198,30 @@ func NewConfig() *Config {
 			Mode:    "embedded",
 		},
 		Instances: make([]InstanceConfig, 0),
+		HA: HAConfig{
+			Enabled: false,
+			ReadWriteSplitting: ReadWriteSplittingConfig{
+				Enabled:        false,
+				ReadStrategy:   ReadStrategyRoundRobin,
+				ReadAfterWrite: "default",
+			},
+			HealthCheck: HealthCheckConfig{
+				Enabled:           true,
+				Interval:          10 * 1e9,
+				Timeout:           5 * 1e9,
+				FailureThreshold:  3,
+				RecoveryThreshold: 2,
+			},
+			Failover: FailoverConfig{
+				Enabled:      false,
+				AutoFailover: false,
+				Timeout:      30 * 1e9,
+				MaxDelay:     1 * 1e9,
+			},
+		},
+		MultiCluster: MultiClusterConfig{
+			Enabled:  false,
+			Clusters: make([]ClusterConfig, 0),
+		},
 	}
 }

@@ -7,6 +7,13 @@ server:
   port: 8080           # API 服务器监听端口（默认：8080）
   mode: release        # 运行模式：debug（调试）或 release（生产）（默认：release）
 
+# 认证配置
+auth:
+  enabled: true        # 是否启用认证
+  token:
+    secret: "test-secret-key-for-e2e-testing"  # JWT 签名密钥
+    expire: "24h"      # Token 过期时间
+
 # 服务发现配置
 discovery:
   type: static         # 发现类型：static（静态配置）、k8s（K8s API）、consul（Consul）

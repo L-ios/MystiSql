@@ -36,6 +36,12 @@ var (
 
 	// ErrResultSetClosed 结果集已关闭
 	ErrResultSetClosed = errors.New("结果集已关闭")
+
+	// ErrNoMasterAvailable 没有可用的主库
+	ErrNoMasterAvailable = errors.New("没有可用的主库")
+
+	// ErrNoSlaveAvailable 没有可用的从库
+	ErrNoSlaveAvailable = errors.New("没有可用的从库")
 )
 
 // 配置相关错误

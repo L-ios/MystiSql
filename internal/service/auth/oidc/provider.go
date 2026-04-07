@@ -2,8 +2,6 @@ package oidc
 
 import (
 	"context"
-	"net/http"
-	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
@@ -52,10 +50,4 @@ func NewOIDCClient(ctx context.Context, issuer, clientID, clientSecret, redirect
 		UserInfoURL: userInfoURL,
 		RoleClaim:   roleClaim,
 	}, nil
-}
-
-// Ensure a small HTTP utility to satisfy future HTTP calls in tests without
-// forcing a live network fetch during initialization.
-func mustHTTPClient() *http.Client {
-	return &http.Client{Timeout: 5 * time.Second}
 }

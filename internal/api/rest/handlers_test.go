@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"MystiSql/internal/connection"
 	"MystiSql/internal/discovery"
 	"MystiSql/internal/service/query"
 	"github.com/gin-gonic/gin"
@@ -19,7 +20,7 @@ func init() {
 func setupTestRouter(t *testing.T) (*gin.Engine, *query.Engine, *zap.Logger) {
 	logger := zap.NewNop()
 	registry := discovery.NewRegistry()
-	engine := query.NewEngine(registry)
+	engine := query.NewEngine(registry, connection.GetRegistry())
 	handlers := NewHandlers(registry, engine, nil, logger, "test-version")
 
 	router := gin.New()

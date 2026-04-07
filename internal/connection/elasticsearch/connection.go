@@ -11,6 +11,7 @@ import (
 	"MystiSql/pkg/types"
 
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
 
 type Connection struct {
@@ -94,11 +95,11 @@ func (c *Connection) Exec(ctx context.Context, query string) (*types.ExecResult,
 
 	start := time.Now()
 
-	res, err := c.client.Index(
-		c.index,
-		strings.NewReader(query),
-		c.client.Index.WithContext(ctx),
-	)
+	req := esapi.IndexRequest{
+		Index: c.index,
+		Body:  strings.NewReader(query),
+	}
+	res, err := req.Do(ctx, c.client)
 	if err != nil {
 		return nil, fmt.Errorf("%w: index failed: %v", errors.ErrQueryFailed, err)
 	}

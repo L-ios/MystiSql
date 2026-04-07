@@ -44,7 +44,7 @@ func NewAuditService(config *AuditConfig, logger *zap.Logger) (*AuditService, er
 		return nil, fmt.Errorf("failed to create log writer: %w", err)
 	}
 
-	rotator := NewLogRotator(config.LogFile, config.RetentionDays, logger)
+	rotator := NewLogRotator(config.LogFile, config.RetentionDays, writer, logger)
 	rotator.Start()
 
 	return &AuditService{

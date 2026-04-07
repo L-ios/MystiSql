@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "io.github.mystisql"
-version = "1.1.0"
+version = project.findProperty("version") as String? ?: "1.1.0"
 
 repositories {
     mavenCentral()
@@ -46,7 +46,11 @@ dependencies {
 }
 
 tasks.test {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        excludeTags("integration")
+    }
+    maxParallelForks = 1
+    systemProperty("junit.jupiter.execution.timeout.default", "30s")
 }
 
 tasks.jar {
@@ -92,10 +96,11 @@ publishing {
     publications {
         create<MavenPublication>("mavenJava") {
             from(components["java"])
+            artifact(tasks.shadowJar)
             pom {
                 name.set("MystiSql JDBC Driver")
                 description.set("JDBC driver for MystiSql - Access K8s databases transparently")
-                url.set("https://github.com/mystisql/mystisql")
+                url.set("https://github.com/L-ios/MystiSql")
                 licenses {
                     license {
                         name.set("The Apache License, Version 2.0")
@@ -106,14 +111,23 @@ publishing {
                     developer {
                         id.set("mystisql")
                         name.set("MystiSql Team")
-                        email.set("mystisql@example.com")
                     }
                 }
                 scm {
-                    connection.set("scm:git:git://github.com/mystisql/mystisql.git")
-                    developerConnection.set("scm:git:ssh://github.com/mystisql/mystisql.git")
-                    url.set("https://github.com/mystisql/mystisql")
+                    connection.set("scm:git:git://github.com/L-ios/MystiSql.git")
+                    developerConnection.set("scm:git:ssh://github.com/L-ios/MystiSql.git")
+                    url.set("https://github.com/L-ios/MystiSql")
                 }
+            }
+        }
+    }
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/${project.property("github.repository")}")
+            credentials {
+                username = project.findProperty("gpr.user") as String? ?: System.getenv("GITHUB_ACTOR")
+                password = project.findProperty("gpr.key") as String? ?: System.getenv("GITHUB_TOKEN")
             }
         }
     }

@@ -311,6 +311,61 @@ func TestAuthRevokeCommand_Integration(t *testing.T) {
 	}
 }
 
+func TestAuthTokenCmdRequestBody_Integration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test")
+	}
+
+	var receivedBody string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/auth/token" && r.Method == "POST" {
+			buf := new(bytes.Buffer)
+			buf.ReadFrom(r.Body)
+			receivedBody = buf.String()
+
+			response := map[string]interface{}{
+				"token":     "mock-jwt-token-12345",
+				"userId":    "admin",
+				"role":      "admin",
+				"expiresAt": time.Now().Add(24 * time.Hour).Format(time.RFC3339),
+				"issuedAt":  time.Now().Format(time.RFC3339),
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(response)
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	t.Run("POST request should have JSON body with user_id and role", func(t *testing.T) {
+		userID := "admin"
+		role := "admin"
+		serverURL := server.URL
+
+		body, err := json.Marshal(map[string]string{
+			"user_id": userID,
+			"role":    role,
+		})
+		require.NoError(t, err)
+
+		client := &http.Client{Timeout: 30 * time.Second}
+
+		resp, err := client.Post(
+			serverURL+"/api/v1/auth/token",
+			"application/json",
+			bytes.NewReader(body),
+		)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.NotEmpty(t, receivedBody, "Request body should not be empty")
+		assert.JSONEq(t, `{"role":"admin","user_id":"admin"}`, receivedBody)
+	})
+}
+
 func TestAuthInfoCommand_Integration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test")

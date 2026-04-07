@@ -148,7 +148,7 @@ public class WebSocketTransport implements Transport {
                 if (future != null) {
                     future.complete(wsMessage);
                 }
-            } else if ("pong".equals(wsMessage.getAction())) {
+            } else if ("pong".equals(wsMessage.getType())) {
                 logger.debug("Received pong");
             }
         } catch (Exception e) {
@@ -232,8 +232,8 @@ public class WebSocketTransport implements Transport {
         
         WsMessage response = sendRequest(request.getInstance(), request.getQuery(), "query");
         
-        if (!response.isSuccess()) {
-            throw createSQLException(response.getError());
+        if (!"query_result".equals(response.getType())) {
+            throw createSQLException(response);
         }
         
         return convertToResultSet(response);
@@ -253,12 +253,12 @@ public class WebSocketTransport implements Transport {
         
         WsMessage response = sendRequest(request.getInstance(), request.getQuery(), "query");
         
-        if (!response.isSuccess()) {
-            throw createSQLException(response.getError());
+        if (!"query_result".equals(response.getType())) {
+            throw createSQLException(response);
         }
         
         ExecResult result = new ExecResult();
-        result.setRowsAffected(response.getRowsAffected() != null ? response.getRowsAffected().longValue() : 0L);
+        result.setRowsAffected(response.getRowCount() != null ? response.getRowCount().longValue() : 0L);
         result.setLastInsertId(response.getLastInsertId());
         return result;
     }
@@ -292,8 +292,12 @@ public class WebSocketTransport implements Transport {
         Object[][] rows = new Object[response.getRows() != null ? response.getRows().size() : 0][];
         if (response.getRows() != null) {
             for (int i = 0; i < response.getRows().size(); i++) {
-                List<Object> row = response.getRows().get(i);
-                rows[i] = row != null ? row.toArray() : new Object[0];
+                Map<String, Object> row = response.getRows().get(i);
+                Object[] ordered = new Object[columns.length];
+                for (int j = 0; j < columns.length; j++) {
+                    ordered[j] = row != null ? row.get(columns[j].getName()) : null;
+                }
+                rows[i] = ordered;
             }
         }
         
@@ -329,13 +333,13 @@ public class WebSocketTransport implements Transport {
         }
     }
     
-    private SQLException createSQLException(WsMessage.ErrorInfo error) {
+    private SQLException createSQLException(WsMessage error) {
         if (error == null) {
             return new SQLException("Unknown error");
         }
         
         String sqlState = mapErrorCodeToSQLState(error.getCode());
-        return new SQLException(error.getMessage(), sqlState);
+        return new SQLException(error.getMessage() != null ? error.getMessage() : "Unknown error", sqlState);
     }
     
     private String mapErrorCodeToSQLState(String errorCode) {
@@ -380,33 +384,33 @@ public class WebSocketTransport implements Transport {
     
     private static class WsMessage {
         private String requestId;
-        private String action;
-        private boolean success;
+        private String type;
         private List<ColumnInfo> columns;
-        private List<List<Object>> rows;
+        private List<Map<String, Object>> rows;
         private Integer rowCount;
         private Long rowsAffected;
         private Long lastInsertId;
-        private ErrorInfo error;
+        private String code;
+        private String message;
         
         public String getRequestId() { return requestId; }
         public void setRequestId(String requestId) { this.requestId = requestId; }
-        public String getAction() { return action; }
-        public void setAction(String action) { this.action = action; }
-        public boolean isSuccess() { return success; }
-        public void setSuccess(boolean success) { this.success = success; }
+        public String getType() { return type; }
+        public void setType(String type) { this.type = type; }
         public List<ColumnInfo> getColumns() { return columns; }
         public void setColumns(List<ColumnInfo> columns) { this.columns = columns; }
-        public List<List<Object>> getRows() { return rows; }
-        public void setRows(List<List<Object>> rows) { this.rows = rows; }
+        public List<Map<String, Object>> getRows() { return rows; }
+        public void setRows(List<Map<String, Object>> rows) { this.rows = rows; }
         public Integer getRowCount() { return rowCount; }
         public void setRowCount(Integer rowCount) { this.rowCount = rowCount; }
         public Long getRowsAffected() { return rowsAffected; }
         public void setRowsAffected(Long rowsAffected) { this.rowsAffected = rowsAffected; }
         public Long getLastInsertId() { return lastInsertId; }
         public void setLastInsertId(Long lastInsertId) { this.lastInsertId = lastInsertId; }
-        public ErrorInfo getError() { return error; }
-        public void setError(ErrorInfo error) { this.error = error; }
+        public String getCode() { return code; }
+        public void setCode(String code) { this.code = code; }
+        public String getMessage() { return message; }
+        public void setMessage(String message) { this.message = message; }
         
         public static class ColumnInfo {
             private String name;
@@ -417,13 +421,5 @@ public class WebSocketTransport implements Transport {
             public void setType(String type) { this.type = type; }
         }
         
-        public static class ErrorInfo {
-            private String code;
-            private String message;
-            public String getCode() { return code; }
-            public void setCode(String code) { this.code = code; }
-            public String getMessage() { return message; }
-            public void setMessage(String message) { this.message = message; }
-        }
     }
 }

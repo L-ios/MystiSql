@@ -50,6 +50,8 @@ type TransactionManager struct {
 	mu           sync.RWMutex
 	logger       *zap.Logger
 	config       *TransactionConfig
+	stopCh       chan struct{}
+	wg           sync.WaitGroup
 }
 
 type TransactionConfig struct {
@@ -78,9 +80,10 @@ func NewTransactionManager(poolManager *pool.ConnectionPoolManager, logger *zap.
 		poolManager:  poolManager,
 		logger:       logger,
 		config:       config,
+		stopCh:       make(chan struct{}),
 	}
 
-	// Start cleanup goroutine
+	tm.wg.Add(1)
 	go tm.cleanupExpiredTransactions()
 
 	return tm
@@ -90,18 +93,15 @@ func (tm *TransactionManager) BeginTransaction(ctx context.Context, instance str
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
 
-	// Check concurrent limit
 	if len(tm.transactions) >= tm.config.MaxConcurrent {
 		return nil, fmt.Errorf("maximum concurrent transactions reached (%d)", tm.config.MaxConcurrent)
 	}
 
-	// Get connection from pool
 	conn, err := tm.poolManager.GetConnection(ctx, instance)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get connection: %w", err)
 	}
 
-	// Generate transaction ID
 	txID := generateTransactionID()
 	connID := generateConnectionID()
 
@@ -119,7 +119,6 @@ func (tm *TransactionManager) BeginTransaction(ctx context.Context, instance str
 		UserID:         userID,
 	}
 
-	// Set isolation level
 	if isolationLevel != types.IsolationLevelDefault {
 		if err := tm.setIsolationLevel(ctx, tx); err != nil {
 			conn.Close()
@@ -127,7 +126,6 @@ func (tm *TransactionManager) BeginTransaction(ctx context.Context, instance str
 		}
 	}
 
-	// Begin transaction
 	if err := tm.begin(ctx, tx); err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
@@ -159,13 +157,12 @@ func (tm *TransactionManager) CommitTransaction(ctx context.Context, txID string
 	}
 
 	if time.Now().After(tx.ExpiresAt) {
-		tm.rollbackTransaction(tx, StateExpired)
+		tm.rollbackAndDelete(tx, StateExpired)
 		return ErrTransactionExpired
 	}
 
-	// Commit
 	if err := tm.commit(ctx, tx); err != nil {
-		tm.rollbackTransaction(tx, StateRolledBack)
+		tm.rollbackAndDelete(tx, StateRolledBack)
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
@@ -194,7 +191,7 @@ func (tm *TransactionManager) RollbackTransaction(ctx context.Context, txID stri
 		return fmt.Errorf("%w: current state is %s", ErrTransactionNotActive, tx.State)
 	}
 
-	tm.rollbackTransaction(tx, StateRolledBack)
+	tm.rollbackAndDelete(tx, StateRolledBack)
 
 	tm.logger.Info("Transaction rolled back",
 		zap.String("tx_id", txID),
@@ -204,10 +201,7 @@ func (tm *TransactionManager) RollbackTransaction(ctx context.Context, txID stri
 	return nil
 }
 
-func (tm *TransactionManager) rollbackTransaction(tx *Transaction, state TransactionState) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
+func (tm *TransactionManager) rollbackTransaction(ctx context.Context, tx *Transaction, state TransactionState) {
 	if err := tm.rollback(ctx, tx); err != nil {
 		tm.logger.Error("Failed to rollback transaction",
 			zap.String("tx_id", tx.ID),
@@ -217,12 +211,20 @@ func (tm *TransactionManager) rollbackTransaction(tx *Transaction, state Transac
 
 	tx.State = state
 	tx.Connection.Close()
+}
+
+// rollbackAndDelete rolls back a transaction and removes it from the map.
+// Caller MUST hold tm.mu.Lock().
+func (tm *TransactionManager) rollbackAndDelete(tx *Transaction, state TransactionState) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	tm.rollbackTransaction(ctx, tx, state)
 	delete(tm.transactions, tx.ID)
 }
 
 func (tm *TransactionManager) GetTransaction(txID string) (*Transaction, error) {
-	tm.mu.RLock()
-	defer tm.mu.RUnlock()
+	tm.mu.Lock()
+	defer tm.mu.Unlock()
 
 	tx, exists := tm.transactions[txID]
 	if !exists {
@@ -233,7 +235,6 @@ func (tm *TransactionManager) GetTransaction(txID string) (*Transaction, error) 
 		return nil, ErrTransactionExpired
 	}
 
-	// Update last activity
 	tx.LastActivityAt = time.Now()
 
 	return tx, nil
@@ -269,22 +270,29 @@ func (tm *TransactionManager) ExtendTransaction(txID string, duration time.Durat
 }
 
 func (tm *TransactionManager) cleanupExpiredTransactions() {
+	defer tm.wg.Done()
+
 	ticker := time.NewTicker(tm.config.CleanupInterval)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		tm.mu.Lock()
-		now := time.Now()
-		for txID, tx := range tm.transactions {
-			if now.After(tx.ExpiresAt) {
-				tm.logger.Warn("Cleaning up expired transaction",
-					zap.String("tx_id", txID),
-					zap.Time("expired_at", tx.ExpiresAt),
-				)
-				tm.rollbackTransaction(tx, StateExpired)
+	for {
+		select {
+		case <-ticker.C:
+			tm.mu.Lock()
+			now := time.Now()
+			for txID, tx := range tm.transactions {
+				if now.After(tx.ExpiresAt) {
+					tm.logger.Warn("Cleaning up expired transaction",
+						zap.String("tx_id", txID),
+						zap.Time("expired_at", tx.ExpiresAt),
+					)
+					tm.rollbackAndDelete(tx, StateExpired)
+				}
 			}
+			tm.mu.Unlock()
+		case <-tm.stopCh:
+			return
 		}
-		tm.mu.Unlock()
 	}
 }
 
@@ -341,14 +349,24 @@ func (tm *TransactionManager) ListTransactions() []*Transaction {
 }
 
 func (tm *TransactionManager) Close() error {
-	tm.mu.Lock()
-	defer tm.mu.Unlock()
+	close(tm.stopCh)
+	tm.wg.Wait()
 
+	tm.mu.Lock()
+	txList := make([]*Transaction, 0, len(tm.transactions))
 	for txID, tx := range tm.transactions {
-		tm.rollbackTransaction(tx, StateRolledBack)
+		txList = append(txList, tx)
 		tm.logger.Info("Transaction closed during shutdown",
 			zap.String("tx_id", txID),
 		)
+	}
+	tm.transactions = make(map[string]*Transaction)
+	tm.mu.Unlock()
+
+	for _, tx := range txList {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		tm.rollbackTransaction(ctx, tx, StateRolledBack)
+		cancel()
 	}
 
 	return nil

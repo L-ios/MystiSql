@@ -2,28 +2,23 @@ package rbac
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 )
 
-func (s *RBACService) PermissionMiddleware(required Permission) gin.HandlerFunc {
+func (r *RBACService) PermissionMiddleware(required Permission) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		raw := c.GetHeader("X-User-Roles")
-		if raw == "" {
+		rolesVal, exists := c.Get("roles")
+		if !exists {
 			c.AbortWithStatus(http.StatusForbidden)
 			return
 		}
-		// Parse roles
-		parts := strings.Split(raw, ",")
-		roles := make([]string, 0, len(parts))
-		for _, p := range parts {
-			t := strings.TrimSpace(p)
-			if t != "" {
-				roles = append(roles, t)
-			}
+		roles, ok := rolesVal.([]string)
+		if !ok || len(roles) == 0 {
+			c.AbortWithStatus(http.StatusForbidden)
+			return
 		}
-		if s.UserHasPermission(roles, required) {
+		if r.UserHasPermission(roles, required) {
 			c.Next()
 			return
 		}

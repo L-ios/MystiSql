@@ -1,0 +1,149 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-binaries:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.7'
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Build cross-platform binaries
+        run: |
+          VERSION=${{ github.ref_name }}
+          BINARY_NAME=mystisql
+          BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')
+          GIT_COMMIT=$(echo ${{ github.sha }} | cut -c1-7)
+          LDFLAGS="-X main.version=$VERSION -X main.date=$BUILD_TIME -X main.commit=$GIT_COMMIT"
+
+          mkdir -p bin/dist
+
+          echo "Building $VERSION with commit $GIT_COMMIT"
+
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o bin/dist/mystisql-$VERSION-linux-amd64 ./cmd/mystisql
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS" -o bin/dist/mystisql-$VERSION-linux-arm64 ./cmd/mystisql
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags "$LDFLAGS" -o bin/dist/mystisql-$VERSION-darwin-amd64 ./cmd/mystisql
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags "$LDFLAGS" -o bin/dist/mystisql-$VERSION-darwin-arm64 ./cmd/mystisql
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS" -o bin/dist/mystisql-$VERSION-windows-amd64.exe ./cmd/mystisql
+          CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -ldflags "$LDFLAGS" -o bin/dist/mystisql-$VERSION-windows-arm64.exe ./cmd/mystisql
+
+      - name: Generate checksums
+        run: cd bin/dist && sha256sum * > checksums.txt
+
+      - name: Upload binaries artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries
+          path: bin/dist/
+
+  build-jdbc:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Build and publish JDBC to GitHub Packages
+        working-directory: jdbc
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          chmod +x gradlew
+          ./gradlew shadowJar publish --no-daemon -Pversion=$VERSION
+
+      - name: Upload JDBC artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jdbc
+          path: jdbc/build/libs/
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: [build-binaries, build-jdbc]
+    steps:
+      - name: Download binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries
+          path: bin/dist/
+
+      - name: Download JDBC
+        uses: actions/download-artifact@v4
+        with:
+          name: jdbc
+          path: jdbc/build/libs/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: 'MystiSql ${{ github.ref_name }}'
+          draft: false
+          prerelease: false
+          files: |
+            bin/dist/*
+            jdbc/build/libs/*.jar
+
+  docker-publish:
+    runs-on: ubuntu-latest
+    needs: [build-binaries]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          platforms: linux/amd64,linux/arm64

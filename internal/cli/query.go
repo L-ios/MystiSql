@@ -10,6 +10,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"MystiSql/internal/connection"
 	"MystiSql/internal/service/query"
 	"MystiSql/pkg/types"
 
@@ -45,7 +46,7 @@ var queryCmd = &cobra.Command{
 		GetSugar().Debugf("在实例 %s 上执行查询: %s", instanceName, sqlQuery)
 
 		// 创建 query engine
-		engine := query.NewEngine(GetRegistry())
+		engine := query.NewEngine(GetRegistry(), connection.GetRegistry())
 
 		// 创建带超时的上下文
 		ctx, cancel := context.WithTimeout(GetContext(), queryTimeout)

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"MystiSql/internal/api/middleware"
+	wsapi "MystiSql/internal/api/websocket"
 	"MystiSql/internal/connection"
 	"MystiSql/internal/connection/mysql"
 	"MystiSql/internal/connection/pool"
@@ -19,6 +20,7 @@ import (
 	"MystiSql/internal/service/auth"
 	"MystiSql/internal/service/batch"
 	"MystiSql/internal/service/query"
+	"MystiSql/internal/service/rbac"
 	"MystiSql/internal/service/transaction"
 	"MystiSql/internal/service/validator"
 	"MystiSql/pkg/types"
@@ -31,6 +33,7 @@ import (
 // Server REST API 服务器
 type Server struct {
 	config              *types.ServerConfig
+	websocketConfig     *types.WebSocketConfig
 	webuiConfig         *types.WebUIConfig
 	registry            discovery.InstanceRegistry
 	engine              *query.Engine
@@ -50,15 +53,18 @@ type Server struct {
 	batchHandlers       *BatchHandlers
 	validatorHandlers   *ValidatorHandlers
 	auditHandlers       *AuditHandlers
+	rbacService         *rbac.RBACService
+	rbacHandlers        *RBACHandlers
 	version             string
-	wsHandlers          *WebSocketHandlers
+	wsHandler           *wsapi.WebSocketHandler
 	webuiHandler        *webui.Handler
 }
 
 // NewServer 创建新的 REST API 服务器
-func NewServer(config *types.ServerConfig, webuiConfig *types.WebUIConfig, registry discovery.InstanceRegistry, engine *query.Engine, authService *auth.AuthService, validatorService *validator.ValidatorService, auditService *audit.AuditService, auditLogFile string, logger *zap.Logger, version string) *Server {
+func NewServer(config *types.ServerConfig, websocketConfig *types.WebSocketConfig, webuiConfig *types.WebUIConfig, registry discovery.InstanceRegistry, engine *query.Engine, authService *auth.AuthService, validatorService *validator.ValidatorService, auditService *audit.AuditService, auditLogFile string, logger *zap.Logger, version string) *Server {
 	return &Server{
 		config:           config,
+		websocketConfig:  websocketConfig,
 		webuiConfig:      webuiConfig,
 		registry:         registry,
 		engine:           engine,
@@ -94,14 +100,15 @@ func (s *Server) Setup() error {
 	}
 
 	// 初始化 WebSocket 处理器
-	if s.wsHandlers == nil && s.authService != nil && s.engine != nil {
-		wsConfig := WebSocketConfig{
-			Enabled:              true,
-			MaxConnections:       1000,
-			IdleTimeout:          10 * time.Minute,
-			MaxConcurrentQueries: 5,
+	if s.wsHandler == nil && s.authService != nil && s.engine != nil {
+		cfg := wsapi.DefaultConfig()
+		if s.websocketConfig != nil {
+			cfg.MaxConnections = s.websocketConfig.MaxConnections
+			if idleTimeout, err := time.ParseDuration(s.websocketConfig.IdleTimeout); err == nil {
+				cfg.IdleTimeout = idleTimeout
+			}
 		}
-		s.wsHandlers = NewWebSocketHandlers(s.authService, s.engine, wsConfig, s.logger)
+		s.wsHandler = wsapi.NewWebSocketHandler(s.engine, s.authService, s.logger, cfg)
 	}
 
 	// 初始化验证器处理器
@@ -124,6 +131,12 @@ func (s *Server) Setup() error {
 			s.logger.Info("WebUI handler initialized")
 		}
 	}
+
+	// 初始化 RBAC
+	if s.rbacService == nil {
+		s.rbacService = rbac.NewRBACService()
+	}
+	s.rbacHandlers = NewRBACHandlers(s.rbacService, s.logger)
 
 	// 初始化 ConnectionPoolManager 和 TransactionManager
 	if err := s.initTransactionManager(); err != nil {
@@ -237,11 +250,24 @@ func (s *Server) setupRoutes() {
 				auditGroup.GET("/stats", s.auditHandlers.GetStats)
 			}
 		}
+
+		// RBAC 路由
+		if s.rbacHandlers != nil {
+			rbacGroup := v1.Group("/rbac")
+			{
+				rbacGroup.POST("/roles", s.rbacHandlers.CreateRole)
+				rbacGroup.GET("/roles", s.rbacHandlers.ListRoles)
+				rbacGroup.DELETE("/roles/:name", s.rbacHandlers.DeleteRole)
+				rbacGroup.GET("/roles/:name", s.rbacHandlers.GetRole)
+				rbacGroup.POST("/users/:id/roles", s.rbacHandlers.AssignRoleToUser)
+				rbacGroup.GET("/users/:id/roles", s.rbacHandlers.ListUserRoles)
+			}
+		}
 	}
 
 	// WebSocket 端点（独立于 API v1）
-	if s.wsHandlers != nil {
-		s.router.GET("/ws", s.wsHandlers.HandleWebSocket)
+	if s.wsHandler != nil {
+		s.router.GET("/ws", s.wsHandler.Handle)
 	}
 
 	// WebUI 端点（必须在所有 API 路由之后）
@@ -274,6 +300,12 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	// 给予 30 秒的优雅关闭时间
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
+
+	if s.wsHandler != nil {
+		if err := s.wsHandler.Close(); err != nil {
+			s.logger.Warn("WebSocket handler close error", zap.Error(err))
+		}
+	}
 
 	if err := s.server.Shutdown(ctx); err != nil {
 		s.logger.Error("Server shutdown error", zap.Error(err))

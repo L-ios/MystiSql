@@ -302,14 +302,6 @@ func (rl *ReadLine) navigateHistory(direction int, currentLine []rune, prompt st
 	return []rune(newLine)
 }
 
-func (rl *ReadLine) clearLine(promptLen, lineLen int) {
-	totalLen := promptLen + lineLen
-	for i := 0; i < totalLen; i++ {
-		fmt.Fprint(rl.terminal.writer, "\b")
-	}
-	fmt.Fprint(rl.terminal.writer, "\r")
-}
-
 func (rl *ReadLine) Reset() {
 	rl.historyIndex = -1
 	rl.currentInput = ""

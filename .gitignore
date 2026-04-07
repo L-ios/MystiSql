@@ -1,3 +1,4 @@
+.idea
 # Go build artifacts
 go.sum
 /bin/
@@ -14,6 +15,7 @@ coverage.out
 coverage.html
 /rest.test
 /batch.test
+/e2e-*
 
 # IDE
 .idea/
@@ -39,6 +41,7 @@ test.txt
 # Frontend build artifacts
 web/dist/
 web/node_modules/
+web/node_modules
 package-lock.json
 web/playwright-report/
 web/test-results/
@@ -60,3 +63,4 @@ Thumbs.db
 # Config files (keep examples)
 config/config.yaml
 !config/config.example.yaml
+.sisyphus/

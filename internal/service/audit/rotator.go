@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -14,26 +15,33 @@ type LogRotator struct {
 	retentionDays int
 	logger        *zap.Logger
 	stopCh        chan struct{}
+	writer        *LogWriter
+	wg            sync.WaitGroup
 }
 
-func NewLogRotator(filePath string, retentionDays int, logger *zap.Logger) *LogRotator {
+func NewLogRotator(filePath string, retentionDays int, writer *LogWriter, logger *zap.Logger) *LogRotator {
 	return &LogRotator{
 		filePath:      filePath,
 		retentionDays: retentionDays,
 		logger:        logger,
 		stopCh:        make(chan struct{}),
+		writer:        writer,
 	}
 }
 
 func (lr *LogRotator) Start() {
+	lr.wg.Add(1)
 	go lr.run()
 }
 
 func (lr *LogRotator) Stop() {
 	close(lr.stopCh)
+	lr.wg.Wait()
 }
 
 func (lr *LogRotator) run() {
+	defer lr.wg.Done()
+
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
@@ -73,6 +81,12 @@ func (lr *LogRotator) RotateOldLogs() error {
 		zap.String("old", lr.filePath),
 		zap.String("new", rotatedPath),
 	)
+
+	if lr.writer != nil {
+		if err := lr.writer.Rotate(); err != nil {
+			lr.logger.Error("Failed to rotate writer", zap.Error(err))
+		}
+	}
 
 	return nil
 }

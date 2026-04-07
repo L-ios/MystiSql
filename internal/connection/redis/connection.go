@@ -325,7 +325,7 @@ func (c *Connection) executeSet(ctx context.Context, query string, start time.Ti
 		seconds, _ := strconv.ParseInt(parts[2], 10, 64)
 		value := strings.Join(parts[3:], " ")
 
-		ok, err := c.client.SetEx(ctx, key, value, time.Duration(seconds)*time.Second).Result()
+		ok, err := c.client.Set(ctx, key, value, time.Duration(seconds)*time.Second).Result()
 		if err != nil {
 			return nil, fmt.Errorf("SETEX failed: %v", err)
 		}

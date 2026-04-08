@@ -409,6 +409,13 @@ flowchart TB
 - 实时展示连接数、QPS、慢查询Top10
 - 异常告警
 
+### 6. 高可用架构
+- 智能读写分离（自动识别主从，路由读写请求）
+- 多种负载均衡策略（轮询、权重、最少连接）
+- 主从切换感知（自动更新路由）
+- 从库延迟检测（延迟过大自动切换到主库）
+- 多集群管理（跨集群实例统一管理）
+
 ## 开发路线
 
 > 按照从底层到上层、从基础功能到高级功能的顺序规划，JDBC驱动作为核心接入能力优先实现
@@ -536,10 +543,30 @@ flowchart TB
 - [ ] 敏感字段识别
 - [ ] 规则脱敏
 
-### Phase 4: 企业增强层 (Enterprise) 🚧 进行中
+### Phase 4: 企业增强层 (Enterprise) ✅ 已完成
 
-**完成度**: 16/18 任务 (89% 完成)
-**当前重点**: WebUI + 审计日志增强
+**完成度**: 28/28 任务 (100% 完成)
+**核心特性**: 高可用架构、企业级安全、完整接入
+
+#### 4.1 服务发现层 - 高级功能
+- [x] 实例动态感知（Watch机制）
+- [x] 服务注册中心发现（Consul/Nacos)
+- [x] 多集群实例管理
+
+#### 4.2 连接层 - 高级功能
+- [x] 读写分离（主从路由）
+- [x] 主从切换感知
+
+#### 4.3 服务层 - 安全增强
+- [x] Token认证（JWT HS256签名）
+- [x] 审计日志基础（JSON Lines格式、日志轮转）
+- [x] SQL安全检查（危险操作检测）
+- [x] SQL白名单/黑名单（正则匹配）
+- [x] **审计日志增强** ✅ **已完成**
+  - 敏感操作自动标记
+  - 增强日志字段（会话ID、SQL类型、客户端详细信息）
+  - 多维度筛选（用户/实例/SQL类型/敏感操作）
+  - 审计统计接口（按用户/实例/时间聚合）
 
 #### 4.4 接入层 - 高级功能
 - [x] WebUI基础界面 ✅
@@ -551,15 +578,11 @@ flowchart TB
   - 敏感操作标记显示
   - SQL 类型筛选
   - 审计统计接口
-- [ ] Oracle驱动支持（go-ora）
-- [ ] Redis驱动支持（go-redis）
-
-- [ ] Redis驱动支持（go-redis）
-
-**当前进度**: 18/28 任务 (64% 完成)
+- [x] Oracle驱动支持（go-ora）
+- [x] Redis驱动支持（go-redis）
 
 **交付物**：企业级数据库访问平台
-支持多数据库、完整安全控制
+支持多数据库、完整安全控制、高可用架构
 
 ---
 
@@ -630,7 +653,7 @@ gantt
 | **M1** | Phase 1 | 可连接MySQL执行SQL | ✅ 已完成 |
 | **M2** | Phase 2 | **JDBC驱动发布**、K8s动态发现、连接池、完整查询能力 | ✅ 已完成 |
 | **M3** | Phase 3 | 安全认证、审计日志、PostgreSQL支持、WebSocket、JDBC增强 | ✅ 已完成 |
-| **M4** | Phase 4 | 企业级权限、读写分离、WebUI上线 | ⏳ 规划中 |
+| **M4** | Phase 4 | 企业级权限、读写分离、WebUI上线、高可用架构 | ✅ 已完成 |
 | **M5** | Phase 5 | 智能化运维平台 | 📋 规划中 |
 
 ### 功能规格 (OpenSpec)
@@ -1639,6 +1662,151 @@ instances:
     database: dev_db
     labels:
       environment: development
+```
+
+#### 高可用配置示例
+
+```yaml
+server:
+  host: 0.0.0.0
+  port: 8080
+  mode: release
+
+# 高可用配置
+ha:
+  enabled: true
+  readWriteSplitting:
+    enabled: true
+    readStrategy: round-robin  # round-robin, weighted, least-conn
+    readAfterWrite: default
+  healthCheck:
+    enabled: true
+    interval: 10s
+    timeout: 5s
+    failureThreshold: 3
+    recoveryThreshold: 2
+  failover:
+    enabled: true
+    autoFailover: false
+    timeout: 30s
+    maxDelay: 1s
+
+# 多集群配置
+multiCluster:
+  enabled: false
+  clusters:
+    - name: cluster-1
+      region: us-east-1
+      instances:
+        - name: mysql-master-us
+          type: mysql
+          host: mysql-master.us-east-1.example.com
+          port: 3306
+          role: master
+        - name: mysql-slave-us-1
+          type: mysql
+          host: mysql-slave-1.us-east-1.example.com
+          port: 3306
+          role: slave
+        - name: mysql-slave-us-2
+          type: mysql
+          host: mysql-slave-2.us-east-1.example.com
+          port: 3306
+          role: slave
+
+instances:
+  - name: production-mysql-master
+    type: mysql
+    host: mysql-master.production.svc.cluster.local
+    port: 3306
+    username: mystisql_user
+    password: ${MYSQL_MASTER_PASSWORD}
+    database: production_db
+    role: master
+    labels:
+      environment: production
+      role: master
+      cluster: production
+      region: us-east-1
+      availabilityZone: us-east-1a
+      version: "8.0"
+      tier: primary
+      owner: database-team
+      purpose: production
+      service: mystisql
+      managedBy: kubernetes
+      lifecycle: production
+      backup: daily
+      monitoring: enabled
+      alerting: enabled
+      securityGroup: sg-123456
+      subnet: subnet-123456
+      vpc: vpc-123456
+      account: 123456789012
+      region: us-east-1
+      cloud: aws
+
+  - name: production-mysql-slave-1
+    type: mysql
+    host: mysql-slave-1.production.svc.cluster.local
+    port: 3306
+    username: mystisql_user
+    password: ${MYSQL_SLAVE_PASSWORD}
+    database: production_db
+    role: slave
+    labels:
+      environment: production
+      role: slave
+      cluster: production
+      region: us-east-1
+      availabilityZone: us-east-1b
+      version: "8.0"
+      tier: primary
+      owner: database-team
+      purpose: production
+      service: mystisql
+      managedBy: kubernetes
+      lifecycle: production
+      backup: daily
+      monitoring: enabled
+      alerting: enabled
+      securityGroup: sg-123456
+      subnet: subnet-123456
+      vpc: vpc-123456
+      account: 123456789012
+      region: us-east-1
+      cloud: aws
+
+  - name: production-mysql-slave-2
+    type: mysql
+    host: mysql-slave-2.production.svc.cluster.local
+    port: 3306
+    username: mystisql_user
+    password: ${MYSQL_SLAVE_PASSWORD}
+    database: production_db
+    role: slave
+    labels:
+      environment: production
+      role: slave
+      cluster: production
+      region: us-east-1
+      availabilityZone: us-east-1c
+      version: "8.0"
+      tier: primary
+      owner: database-team
+      purpose: production
+      service: mystisql
+      managedBy: kubernetes
+      lifecycle: production
+      backup: daily
+      monitoring: enabled
+      alerting: enabled
+      securityGroup: sg-123456
+      subnet: subnet-123456
+      vpc: vpc-123456
+      account: 123456789012
+      region: us-east-1
+      cloud: aws
 ```
 
 #### 生产环境配置

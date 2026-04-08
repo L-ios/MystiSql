@@ -48,7 +48,7 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform {
-        excludeTags("integration")
+        excludeTags("integration", "e2e")
     }
     maxParallelForks = 1
     systemProperty("junit.jupiter.execution.timeout.default", "30s")

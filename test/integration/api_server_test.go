@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"MystiSql/internal/api/rest"
+	"MystiSql/internal/connection"
 	"MystiSql/internal/discovery"
 	"MystiSql/internal/service/audit"
 	"MystiSql/internal/service/auth"
@@ -35,7 +36,7 @@ func TestAPIServerLifecycle(t *testing.T) {
 	logger := zap.NewNop()
 
 	webuiConfig := &types.WebUIConfig{Enabled: false}
-	engine := query.NewEngine(registry)
+	engine := query.NewEngine(registry, connection.GetRegistry())
 	authService, err := auth.NewAuthService("test-secret", 24*time.Hour)
 	if err != nil {
 		t.Fatalf("创建认证服务失败: %v", err)
@@ -46,7 +47,8 @@ func TestAPIServerLifecycle(t *testing.T) {
 		t.Fatalf("创建审计服务失败: %v", err)
 	}
 
-	server := rest.NewServer(cfg, webuiConfig, registry, engine, authService, validatorService, auditService, "", logger, "test")
+	websocketConfig := &types.WebSocketConfig{Enabled: false}
+	server := rest.NewServer(cfg, websocketConfig, webuiConfig, registry, engine, authService, validatorService, auditService, "", logger, "test")
 
 	if err := server.Setup(); err != nil {
 		t.Fatalf("设置服务器失败: %v", err)
@@ -102,7 +104,7 @@ func TestAPIEndpoints(t *testing.T) {
 	logger := zap.NewNop()
 
 	webuiConfig := &types.WebUIConfig{Enabled: false}
-	engine := query.NewEngine(registry)
+	engine := query.NewEngine(registry, connection.GetRegistry())
 	authService, err := auth.NewAuthService("test-secret", 24*time.Hour)
 	if err != nil {
 		t.Fatalf("创建认证服务失败: %v", err)
@@ -113,7 +115,8 @@ func TestAPIEndpoints(t *testing.T) {
 		t.Fatalf("创建审计服务失败: %v", err)
 	}
 
-	server := rest.NewServer(cfg, webuiConfig, registry, engine, authService, validatorService, auditService, "", logger, "test")
+	websocketConfig := &types.WebSocketConfig{Enabled: false}
+	server := rest.NewServer(cfg, websocketConfig, webuiConfig, registry, engine, authService, validatorService, auditService, "", logger, "test")
 
 	if err := server.Setup(); err != nil {
 		t.Fatalf("设置服务器失败: %v", err)

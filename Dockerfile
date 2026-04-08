@@ -44,8 +44,7 @@ COPY --from=builder /app/mystisql /app/mystisql
 # Copy frontend dist from frontend-builder
 COPY --from=frontend-builder /web/dist /app/web/dist
 
-# Copy default config (optional)
-COPY config.yaml /app/config.yaml
+# Copy default config (optional) - commented out as config.yaml is not required
 
 # Create log directory
 RUN mkdir -p /var/log/mystisql

@@ -14,12 +14,9 @@ import (
 )
 
 type TopologyManager struct {
-	mu         sync.RWMutex
-	topologies map[string]*types.MasterSlaveTopology
-	pools      map[string]*pool.MasterSlavePool
-	factory    interface {
-		CreateConnection(instance *types.DatabaseInstance) (interface{}, error)
-	}
+	mu              sync.RWMutex
+	topologies      map[string]*types.MasterSlaveTopology
+	pools           map[string]*pool.MasterSlavePool
 	config          *types.HAConfig
 	logger          *zap.Logger
 	eventCh         chan types.TopologyEvent

@@ -43,6 +43,7 @@ web/dist/
 web/node_modules/
 web/node_modules
 package-lock.json
+!web/package-lock.json
 web/playwright-report/
 web/test-results/
 

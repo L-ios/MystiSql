@@ -1,7 +1,7 @@
 plugins {
     `java-library`
     `maven-publish`
-    id("com.gradleup.shadow") version "8.3.5"
+    id("io.github.goooler.shadow") version "8.1.8"
 }
 
 group = "io.github.mystisql"
@@ -12,15 +12,23 @@ repositories {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
     withSourcesJar()
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
 }
 
 sourceSets {
     main {
         java {
             exclude("**/examples/**")
+        }
+    }
+    test {
+        java {
+            srcDirs("../e2e-test/jdbc")
         }
     }
 }
@@ -40,7 +48,7 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform {
-        excludeTags("integration")
+        excludeTags("integration", "e2e")
     }
     maxParallelForks = 1
     systemProperty("junit.jupiter.execution.timeout.default", "30s")
@@ -88,7 +96,6 @@ tasks.build {
 publishing {
     publications {
         create<MavenPublication>("mavenJava") {
-            from(components["java"])
             artifact(tasks.shadowJar)
             pom {
                 name.set("MystiSql JDBC Driver")

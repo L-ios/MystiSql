@@ -12,6 +12,10 @@ type InstanceConfig struct {
 	Labels    map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Role      string            `json:"role,omitempty" yaml:"role,omitempty"`           // primary, replica, readwrite (default)
 	ReplicaOf string            `json:"replicaOf,omitempty" yaml:"replicaOf,omitempty"` // Name of primary instance
+
+	// 高可用配置
+	Master string `json:"master,omitempty" yaml:"master,omitempty"` // 关联的主库名称（从库专用）
+	Weight int    `json:"weight,omitempty" yaml:"weight,omitempty"` // 负载均衡权重
 }
 
 // ToDatabaseInstance 将 InstanceConfig 转换为 DatabaseInstance
@@ -33,6 +37,10 @@ func (c *InstanceConfig) ToDatabaseInstance() *DatabaseInstance {
 	if c.ReplicaOf != "" {
 		instance.ReplicaOf = c.ReplicaOf
 	}
+
+	// 设置高可用相关字段
+	instance.Master = c.Master
+	instance.Weight = c.Weight
 
 	return instance
 }
@@ -124,17 +132,19 @@ type CORSConfig struct {
 
 // Config 定义应用程序的根配置
 type Config struct {
-	Server    ServerConfig     `json:"server" yaml:"server"`
-	Auth      AuthConfig       `json:"auth" yaml:"auth"`
-	Audit     AuditConfig      `json:"audit" yaml:"audit"`
-	Validator ValidatorConfig  `json:"validator" yaml:"validator"`
-	Discovery DiscoveryConfig  `json:"discovery" yaml:"discovery"`
-	Health    HealthConfig     `json:"health" yaml:"health"`
-	Pool      PoolConfig       `json:"pool" yaml:"pool"`
-	WebSocket WebSocketConfig  `json:"websocket" yaml:"websocket"`
-	WebUI     WebUIConfig      `json:"webui" yaml:"webui"`
-	CORS      CORSConfig       `json:"cors" yaml:"cors"`
-	Instances []InstanceConfig `json:"instances" yaml:"instances"`
+	Server       ServerConfig       `json:"server" yaml:"server"`
+	Auth         AuthConfig         `json:"auth" yaml:"auth"`
+	Audit        AuditConfig        `json:"audit" yaml:"audit"`
+	Validator    ValidatorConfig    `json:"validator" yaml:"validator"`
+	Discovery    DiscoveryConfig    `json:"discovery" yaml:"discovery"`
+	Health       HealthConfig       `json:"health" yaml:"health"`
+	Pool         PoolConfig         `json:"pool" yaml:"pool"`
+	WebSocket    WebSocketConfig    `json:"websocket" yaml:"websocket"`
+	WebUI        WebUIConfig        `json:"webui" yaml:"webui"`
+	CORS         CORSConfig         `json:"cors" yaml:"cors"`
+	Instances    []InstanceConfig   `json:"instances" yaml:"instances"`
+	HA           HAConfig           `json:"ha" yaml:"ha"`
+	MultiCluster MultiClusterConfig `json:"multiCluster" yaml:"multiCluster"`
 }
 
 // NewConfig 创建一个带有默认值的配置
@@ -208,5 +218,30 @@ func NewConfig() *Config {
 			Mode:    "embedded",
 		},
 		Instances: make([]InstanceConfig, 0),
+		HA: HAConfig{
+			Enabled: false,
+			ReadWriteSplitting: ReadWriteSplittingConfig{
+				Enabled:        false,
+				ReadStrategy:   ReadStrategyRoundRobin,
+				ReadAfterWrite: "default",
+			},
+			HealthCheck: HealthCheckConfig{
+				Enabled:           true,
+				Interval:          10 * 1e9,
+				Timeout:           5 * 1e9,
+				FailureThreshold:  3,
+				RecoveryThreshold: 2,
+			},
+			Failover: FailoverConfig{
+				Enabled:      false,
+				AutoFailover: false,
+				Timeout:      30 * 1e9,
+				MaxDelay:     1 * 1e9,
+			},
+		},
+		MultiCluster: MultiClusterConfig{
+			Enabled:  false,
+			Clusters: make([]ClusterConfig, 0),
+		},
 	}
 }

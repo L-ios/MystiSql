@@ -56,7 +56,7 @@ func (e *Engine) SetMaskingService(service *masking.MaskingService) {
 	e.maskingService = service
 }
 
-func (e *Engine) ExecuteQuery(ctx context.Context, instanceName, query string) (*types.QueryResult, error) {
+func (e *Engine) execute(ctx context.Context, instanceName, query string, executor func(connection.Connection, context.Context, string) (interface{}, error), resultProcessor func(interface{}, *SQLParseResult) (interface{}, error)) (interface{}, error) {
 	startTime := time.Now()
 
 	parseResult, err := e.parser.Parse(query)
@@ -102,7 +102,7 @@ func (e *Engine) ExecuteQuery(ctx context.Context, instanceName, query string) (
 	}
 	defer conn.Close()
 
-	result, err := conn.Query(ctx, query)
+	result, err := executor(conn, ctx, query)
 
 	if auditSvc != nil {
 		auditLog := audit.NewAuditLog(
@@ -112,95 +112,15 @@ func (e *Engine) ExecuteQuery(ctx context.Context, instanceName, query string) (
 			"",
 			query,
 		)
-		var rowCount int64
+		var affectedRows int64
 		if result != nil {
-			rowCount = int64(result.RowCount)
+			if qr, ok := result.(*types.QueryResult); ok {
+				affectedRows = int64(qr.RowCount)
+			} else if er, ok := result.(*types.ExecResult); ok {
+				affectedRows = er.RowsAffected
+			}
 		}
-		auditLog.SetQueryInfo(string(parseResult.StatementType), rowCount, time.Since(startTime).Milliseconds())
-
-		if err != nil {
-			auditLog.SetError(err.Error())
-		} else {
-			auditLog.SetSuccess()
-		}
-
-		_ = auditSvc.Log(ctx, auditLog)
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("执行查询失败: %w", err)
-	}
-
-	result = WithResultSizeLimit(result, parseResult.MaxResultSize)
-
-	if maskingSvc != nil {
-		if role := getRoleFromContext(ctx); role != "" {
-			result = maskingSvc.MaskResult(role, result)
-		}
-	}
-
-	return result, nil
-}
-
-func (e *Engine) ExecuteExec(ctx context.Context, instanceName, query string) (*types.ExecResult, error) {
-	parseResult, err := e.parser.Parse(query)
-	if err != nil {
-		return nil, fmt.Errorf("解析 SQL 语句失败: %w", err)
-	}
-
-	if err := e.parser.Validate(query); err != nil {
-		return nil, fmt.Errorf("验证 SQL 语句失败: %w", err)
-	}
-
-	e.mu.RLock()
-	validatorSvc := e.validatorService
-	auditSvc := e.auditService
-	e.mu.RUnlock()
-
-	if validatorSvc != nil {
-		validationResult, err := validatorSvc.Validate(ctx, instanceName, query)
-		if err != nil {
-			return nil, fmt.Errorf("SQL 验证失败: %w", err)
-		}
-		if !validationResult.Allowed {
-			return nil, fmt.Errorf("SQL 被拦截: %s", validationResult.Reason)
-		}
-	}
-
-	targetInstance, err := e.resolveInstance(ctx, instanceName, query)
-	if err != nil {
-		return nil, err
-	}
-	pool, err := e.getConnectionPool(ctx, targetInstance)
-	if err != nil {
-		return nil, err
-	}
-
-	ctx, cancel := WithTimeout(ctx, parseResult.QueryTimeout)
-	defer cancel()
-
-	conn, err := pool.GetConnection(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("获取数据库连接失败: %w", err)
-	}
-	defer conn.Close()
-
-	startTime := time.Now()
-	result, err := conn.Exec(ctx, query)
-
-	if auditSvc != nil {
-		auditLog := audit.NewAuditLog(
-			getUserIDFromContext(ctx),
-			getClientIPFromContext(ctx),
-			instanceName,
-			"",
-			query,
-		)
-		var rowsAffected int64
-		if result != nil {
-			rowsAffected = result.RowsAffected
-		}
-		auditLog.SetQueryInfo(string(parseResult.StatementType), rowsAffected, time.Since(startTime).Milliseconds())
+		auditLog.SetQueryInfo(string(parseResult.StatementType), affectedRows, time.Since(startTime).Milliseconds())
 
 		if err != nil {
 			auditLog.SetError(err.Error())
@@ -215,7 +135,66 @@ func (e *Engine) ExecuteExec(ctx context.Context, instanceName, query string) (*
 		return nil, fmt.Errorf("执行语句失败: %w", err)
 	}
 
+	result, err = resultProcessor(result, parseResult)
+	if err != nil {
+		return nil, err
+	}
+
+	if maskingSvc != nil {
+		if role := getRoleFromContext(ctx); role != "" {
+			if qr, ok := result.(*types.QueryResult); ok {
+				result = maskingSvc.MaskResult(role, qr)
+			}
+		}
+	}
+
 	return result, nil
+}
+
+func (e *Engine) ExecuteQuery(ctx context.Context, instanceName, query string) (*types.QueryResult, error) {
+	result, err := e.execute(ctx, instanceName, query,
+		func(conn connection.Connection, ctx context.Context, query string) (interface{}, error) {
+			return conn.Query(ctx, query)
+		},
+		func(result interface{}, parseResult *SQLParseResult) (interface{}, error) {
+			qr, ok := result.(*types.QueryResult)
+			if !ok {
+				return nil, fmt.Errorf("invalid query result type")
+			}
+			return WithResultSizeLimit(qr, parseResult.MaxResultSize), nil
+		})
+
+	if err != nil {
+		return nil, err
+	}
+	qr, ok := result.(*types.QueryResult)
+	if !ok {
+		return nil, fmt.Errorf("invalid query result type")
+	}
+	return qr, nil
+}
+
+func (e *Engine) ExecuteExec(ctx context.Context, instanceName, query string) (*types.ExecResult, error) {
+	result, err := e.execute(ctx, instanceName, query,
+		func(conn connection.Connection, ctx context.Context, query string) (interface{}, error) {
+			return conn.Exec(ctx, query)
+		},
+		func(result interface{}, parseResult *SQLParseResult) (interface{}, error) {
+			er, ok := result.(*types.ExecResult)
+			if !ok {
+				return nil, fmt.Errorf("invalid exec result type")
+			}
+			return er, nil
+		})
+
+	if err != nil {
+		return nil, err
+	}
+	er, ok := result.(*types.ExecResult)
+	if !ok {
+		return nil, fmt.Errorf("invalid exec result type")
+	}
+	return er, nil
 }
 
 func (e *Engine) PingInstance(ctx context.Context, instanceName string) error {

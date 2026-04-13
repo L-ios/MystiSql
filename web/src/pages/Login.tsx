@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Form, Input, Button, Card, message, Typography } from 'antd'
 import { useAuthStore } from '../stores/authStore'
 import { apiClient } from '../api'
@@ -13,6 +14,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const setAuth = useAuthStore((state) => state.setAuth)
   const [form] = Form.useForm()
+  const navigate = useNavigate()
 
   const handleSubmit = async (values: LoginForm) => {
     setLoading(true)
@@ -22,7 +24,7 @@ export default function Login() {
         const expiresAt = new Date(result.expiresAt).getTime()
         setAuth(values.token, result.userId, result.role, expiresAt)
         message.success('登录成功')
-        window.location.href = '/dashboard'
+        navigate('/dashboard')
       } else {
         message.error(result.error || 'Token 无效')
       }
@@ -70,6 +72,7 @@ export default function Login() {
           </Form.Item>
           <Form.Item>
             <Button
+              data-testid="login-button"
               type="primary"
               htmlType="submit"
               loading={loading}

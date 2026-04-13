@@ -44,12 +44,16 @@ type DatabaseInstance struct {
 	Status InstanceStatus `json:"status" yaml:"status"` // 实例状态
 
 	// 路由信息
-	Role      string `json:"role,omitempty" yaml:"role,omitempty"`           // primary, replica, readwrite (default)
+	Role      string `json:"role,omitempty" yaml:"role,omitempty"`           // primary, replica, readwrite, master, slave
 	ReplicaOf string `json:"replicaOf,omitempty" yaml:"replicaOf,omitempty"` // Name of primary instance
 
 	// 元数据
 	Labels      map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`           // 标签（K8s 风格）
 	Annotations map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"` // 注解
+
+	// 高可用配置
+	Master string `json:"master,omitempty" yaml:"master,omitempty"` // 关联的主库名称（从库专用）
+	Weight int    `json:"weight,omitempty" yaml:"weight,omitempty"` // 负载均衡权重
 
 	// 时间戳
 	CreatedAt time.Time `json:"createdAt" yaml:"createdAt"` // 创建时间
@@ -65,6 +69,8 @@ func NewDatabaseInstance(name string, dbType DatabaseType, host string, port int
 		Host:      host,
 		Port:      port,
 		Status:    InstanceStatusUnknown,
+		Role:      string(InstanceRoleMaster),
+		Weight:    1,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}

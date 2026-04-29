@@ -1,0 +1,29 @@
+# MystiSql 测试环境 - PostgreSQL 16
+#
+# 使用方法:
+#   podman-compose up -d
+#   podman-compose down -v
+
+services:
+  postgresql:
+    image: docker.io/library/postgres:16-alpine
+    container_name: mystisql-postgresql
+    restart: unless-stopped
+    ports:
+      - "15432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: test123456
+      POSTGRES_DB: mystisql_test
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    shm_size: 128m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mystisql_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  postgresql-data:

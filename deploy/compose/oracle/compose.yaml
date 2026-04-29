@@ -1,0 +1,34 @@
+# MystiSql 测试环境 - Oracle XE 21c (gvenzl/oracle-xe)
+#
+# 注意:
+#   - 仅支持 linux/amd64，ARM 需使用 oracle-free:23-slim
+#   - 首次启动较慢 (60-120s)，请耐心等待 healthy 状态
+#
+# 使用方法:
+#   podman-compose up -d
+#   podman-compose down -v
+
+services:
+  oracle:
+    image: docker.io/gvenzl/oracle-xe:21-slim-faststart
+    container_name: mystisql-oracle
+    platform: linux/amd64
+    restart: unless-stopped
+    ports:
+      - "11521:1521"
+    environment:
+      ORACLE_PASSWORD: test123456
+      ORACLE_CHARACTERSET: AL32UTF8
+      APP_USER: mystisql
+      APP_USER_PASSWORD: test123456
+    volumes:
+      - oracle-data:/opt/oracle/oradata
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 120s
+
+volumes:
+  oracle-data:

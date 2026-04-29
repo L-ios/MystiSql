@@ -1,0 +1,45 @@
+# MystiSql 测试环境 - Elasticsearch 8.17
+#
+# 注意:
+#   - 测试环境已禁用全部安全特性 (xpack.security)
+#   - 最少需要 2GB 内存，JVM heap 设为 512MB
+#   - 宿主机可能需要: sudo sysctl -w vm.max_map_count=262144
+#
+# 使用方法:
+#   podman-compose up -d
+#   podman-compose down -v
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
+    container_name: mystisql-elasticsearch
+    restart: unless-stopped
+    ports:
+      - "19200:9200"
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      xpack.security.enrollment.enabled: "false"
+      xpack.security.http.ssl.enabled: "false"
+      xpack.security.transport.ssl.enabled: "false"
+      xpack.ml.enabled: "false"
+      cluster.routing.allocation.disk.threshold_enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+
+volumes:
+  es-data:

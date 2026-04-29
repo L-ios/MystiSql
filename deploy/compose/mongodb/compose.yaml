@@ -1,0 +1,30 @@
+# MystiSql 测试环境 - MongoDB 7
+#
+# 注意: MongoDB 连接实现尚未开发，此文件仅为将来测试准备
+#
+# 使用方法:
+#   podman-compose up -d
+#   podman-compose down -v
+
+services:
+  mongodb:
+    image: docker.io/library/mongo:7
+    container_name: mystisql-mongodb
+    restart: unless-stopped
+    ports:
+      - "17017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: mongouser
+      MONGO_INITDB_ROOT_PASSWORD: test123456
+      MONGO_INITDB_DATABASE: mystisql_test
+    volumes:
+      - mongodb-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping').ok", "--quiet"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  mongodb-data:

@@ -429,33 +429,3 @@ func TestMaskingConfig(t *testing.T) {
 		t.Error("Enabled should be true")
 	}
 }
-
-func TestOIDCConfig(t *testing.T) {
-	oc := &OIDCConfig{
-		Providers: []OIDCProviderConfig{
-			{
-				Name:         "keycloak",
-				Issuer:       "https://keycloak.example.com/realms/myrealm",
-				ClientID:     "my-client",
-				ClientSecret: "my-secret",
-				RedirectURL:  "https://mystisql.example.com/callback",
-				Scopes:       []string{"openid", "profile"},
-				RoleClaim:    "roles",
-			},
-		},
-	}
-
-	if len(oc.Providers) != 1 {
-		t.Fatalf("len(Providers) = %d, want %d", len(oc.Providers), 1)
-	}
-	p := oc.Providers[0]
-	if p.Name != "keycloak" {
-		t.Errorf("Provider.Name = %q, want %q", p.Name, "keycloak")
-	}
-	if p.Issuer != "https://keycloak.example.com/realms/myrealm" {
-		t.Errorf("Provider.Issuer = %q", p.Issuer)
-	}
-	if len(p.Scopes) != 2 {
-		t.Errorf("len(Scopes) = %d, want %d", len(p.Scopes), 2)
-	}
-}

@@ -8,20 +8,32 @@ import (
 )
 
 type ValidatorService struct {
-	validator *SQLValidatorImpl
-	whitelist *WhitelistManagerImpl
-	blacklist *BlacklistManagerImpl
-	logger    *zap.Logger
-	mu        sync.RWMutex
+	validator    *SQLValidatorImpl
+	astValidator *ASTValidator
+	whitelist    *WhitelistManagerImpl
+	blacklist    *BlacklistManagerImpl
+	logger       *zap.Logger
+	mu           sync.RWMutex
 }
 
 func NewValidatorService(logger *zap.Logger) *ValidatorService {
-	return &ValidatorService{
+	return NewValidatorServiceWithConfig(logger, false)
+}
+
+// NewValidatorServiceWithConfig creates a ValidatorService with the option to enable AST-based validation.
+func NewValidatorServiceWithConfig(logger *zap.Logger, useParser bool) *ValidatorService {
+	s := &ValidatorService{
 		validator: NewSQLValidator(),
 		whitelist: NewWhitelistManager(),
 		blacklist: NewBlacklistManager(),
 		logger:    logger,
 	}
+
+	if useParser {
+		s.astValidator = NewASTValidator(s.validator, logger)
+	}
+
+	return s
 }
 
 func (s *ValidatorService) Validate(ctx context.Context, instance, query string) (*ValidationResult, error) {
@@ -52,6 +64,9 @@ func (s *ValidatorService) Validate(ctx context.Context, instance, query string)
 		}, nil
 	}
 
+	if s.astValidator != nil {
+		return s.astValidator.Validate(ctx, instance, query)
+	}
 	return s.validator.Validate(ctx, instance, query)
 }
 

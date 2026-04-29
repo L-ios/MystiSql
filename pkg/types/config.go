@@ -107,6 +107,7 @@ type ValidatorConfig struct {
 	DangerousOperations []string `json:"dangerousOperations" yaml:"dangerousOperations"`
 	Whitelist           []string `json:"whitelist" yaml:"whitelist"`
 	Blacklist           []string `json:"blacklist" yaml:"blacklist"`
+	UseParser           bool     `json:"useParser" yaml:"useParser"`
 }
 
 // WebSocketConfig 定义 WebSocket 配置
@@ -173,6 +174,7 @@ func NewConfig() *Config {
 			DangerousOperations: []string{"DROP", "TRUNCATE", "DELETE_WITHOUT_WHERE", "UPDATE_WITHOUT_WHERE"},
 			Whitelist:           []string{},
 			Blacklist:           []string{},
+			UseParser:           false,
 		},
 		Discovery: DiscoveryConfig{
 			Type: "static",

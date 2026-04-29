@@ -1,0 +1,155 @@
+# MystiSql 统一测试配置
+#
+# 此配置包含所有 10 种数据库的实例定义，端口和凭据与 deploy/compose/ 下的 compose.yaml 对应。
+# 使用方式:
+#   1. 启动需要的数据库: podman-compose -f deploy/compose/<db>/compose.yaml up -d
+#   2. 启动 MystiSql:    ./bin/mystisql serve --config deploy/compose/config.yaml
+#
+# 端口映射表:
+#   MySQL         13306    PostgreSQL    15432    Oracle      11521
+#   Redis         16379    MSSQL         11433    MongoDB     17017
+#   Elasticsearch 19200    ClickHouse    18123    Etcd        12379
+#   SQLite        (本地文件)
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  mode: "debug"
+
+discovery:
+  type: "static"
+
+instances:
+  # ─── MySQL 8.4 ───────────────────────────────────────────
+  - name: "test-mysql"
+    type: "mysql"
+    host: "127.0.0.1"
+    port: 13306
+    username: "root"
+    password: "test123456"
+    database: "mystisql_test"
+
+  # ─── PostgreSQL 16 ───────────────────────────────────────
+  - name: "test-postgresql"
+    type: "postgresql"
+    host: "127.0.0.1"
+    port: 15432
+    username: "postgres"
+    password: "test123456"
+    database: "mystisql_test"
+    labels:
+      sslmode: "disable"
+
+  # ─── Oracle XE 21c ───────────────────────────────────────
+  # PDB 名称: XEPDB1，应用用户: mystisql
+  - name: "test-oracle"
+    type: "oracle"
+    host: "127.0.0.1"
+    port: 11521
+    username: "mystisql"
+    password: "test123456"
+    database: "xepdb1"
+
+  # ─── Redis 7 ─────────────────────────────────────────────
+  - name: "test-redis"
+    type: "redis"
+    host: "127.0.0.1"
+    port: 16379
+    username: ""
+    password: "test123456"
+
+  # ─── SQLite (本地文件，无需容器) ──────────────────────────
+  - name: "test-sqlite"
+    type: "sqlite"
+    host: ""
+    port: 0
+    database: ":memory:"
+
+  # ─── MSSQL 2022 Express ──────────────────────────────────
+  - name: "test-mssql"
+    type: "mssql"
+    host: "127.0.0.1"
+    port: 11433
+    username: "sa"
+    password: "Test123456!"
+    database: "master"
+
+  # ─── MongoDB 7 (连接实现尚未开发) ─────────────────────────
+  # - name: "test-mongodb"
+  #   type: "mongodb"
+  #   host: "127.0.0.1"
+  #   port: 17017
+  #   username: "mongouser"
+  #   password: "test123456"
+  #   database: "mystisql_test"
+
+  # ─── Elasticsearch 8.17 ──────────────────────────────────
+  - name: "test-elasticsearch"
+    type: "elasticsearch"
+    host: "127.0.0.1"
+    port: 19200
+    username: ""
+    password: ""
+    database: "mystisql_test"
+
+  # ─── ClickHouse ──────────────────────────────────────────
+  - name: "test-clickhouse"
+    type: "clickhouse"
+    host: "127.0.0.1"
+    port: 19000
+    username: "default"
+    password: "test123456"
+    database: "mystisql_test"
+
+  # ─── Etcd v3.6 ───────────────────────────────────────────
+  - name: "test-etcd"
+    type: "etcd"
+    host: "127.0.0.1"
+    port: 12379
+
+# ─── 认证配置 ──────────────────────────────────────────────
+auth:
+  enabled: true
+  token:
+    secret: "e2e-test-secret-key-do-not-use-in-production"
+    expire: "24h"
+  whitelist:
+    - "/health"
+    - "/metrics"
+
+# ─── 审计日志 ──────────────────────────────────────────────
+audit:
+  enabled: true
+  logFile: "/tmp/mystisql-e2e-audit.log"
+  retentionDays: 7
+
+# ─── SQL 验证器 ────────────────────────────────────────────
+validator:
+  enabled: true
+  dangerousOperations:
+    - "DROP"
+    - "TRUNCATE"
+    - "DELETE_WITHOUT_WHERE"
+    - "UPDATE_WITHOUT_WHERE"
+
+# ─── WebSocket ─────────────────────────────────────────────
+websocket:
+  enabled: true
+  maxConnections: 100
+  idleTimeout: "5m"
+  maxConcurrentQueries: 5
+
+# ─── 连接池 ────────────────────────────────────────────────
+pool:
+  maxConnections: 10
+  minConnections: 2
+  maxIdleTime: "30s"
+  maxLifetime: "1h"
+  connectionTimeout: "10s"
+  pingInterval: "30s"
+
+# ─── 日志 ──────────────────────────────────────────────────
+logging:
+  level: "debug"
+  format: "console"
+  output: "stdout"

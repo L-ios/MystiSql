@@ -1,0 +1,35 @@
+# MystiSql 测试环境 - Etcd v3.5 (单节点)
+#
+# 使用方法:
+#   podman-compose up -d
+#   podman-compose down -v
+
+services:
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.17
+    container_name: mystisql-etcd
+    restart: unless-stopped
+    ports:
+      - "12379:2379"
+    command:
+      - etcd
+      - --name=s1
+      - --data-dir=/etcd-data
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --advertise-client-urls=http://0.0.0.0:2379
+      - --listen-peer-urls=http://0.0.0.0:2380
+      - --initial-advertise-peer-urls=http://0.0.0.0:2380
+      - --initial-cluster=s1=http://0.0.0.0:2380
+      - --initial-cluster-token=mystisql-etcd
+      - --initial-cluster-state=new
+    volumes:
+      - etcd-data:/etcd-data
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  etcd-data:

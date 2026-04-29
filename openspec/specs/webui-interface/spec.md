@@ -13,10 +13,6 @@
 - **WHEN** 用户输入用户名和 Token
 - **THEN** 系统验证并建立会话
 
-#### Scenario: OIDC 登录
-- **WHEN** 用户点击 OIDC 登录按钮
-- **THEN** 重定向到 OIDC 提供者
-
 #### Scenario: LDAP 登录
 - **WHEN** 用户输入 LDAP 用户名和密码
 - **THEN** 系统验证 LDAP 凭据

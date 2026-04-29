@@ -13,6 +13,41 @@ Authorization: Bearer <jwt_token>
 
 ---
 
+## 健康检查
+
+### 检查服务状态
+
+检查服务健康状态，无需认证。
+
+**请求**
+```http
+GET /health
+```
+
+**请求示例：**
+```bash
+curl http://localhost:8080/health
+```
+
+**响应**
+```json
+{
+  "status": "healthy",
+  "version": "0.1.0",
+  "timestamp": "2026-03-06T10:00:00Z"
+}
+```
+
+**字段说明：**
+
+| 字段 | 类型 | 说明 |
+|-----|------|------|
+| status | string | 服务状态：healthy（健康）、unhealthy（不健康） |
+| version | string | MystiSql 版本号 |
+| timestamp | string | 响应时间戳（ISO 8601 格式） |
+
+---
+
 ## 认证 API
 
 ### 生成 Token
@@ -809,17 +844,43 @@ ws://localhost:8080/ws?token=<jwt_token>
 
 ---
 
-## 错误代码
+## CORS 支持
+
+API 支持 CORS（跨域资源共享），允许从 Web 前端调用：
+
+```
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Methods: GET, POST, OPTIONS
+Access-Control-Allow-Headers: Content-Type
+```
+
+---
+
+## 错误响应
+
+当请求失败时，API 返回统一错误格式：
+
+**响应格式：**
+```json
+{
+  "error": "错误描述",
+  "code": "ERROR_CODE",
+  "details": "详细错误信息"
+}
+```
 
 ### 通用错误
 
-| 错误代码 | HTTP 状态码 | 说明 |
-|---------|-----------|------|
-| `INVALID_REQUEST` | 400 | 请求参数无效 |
-| `UNAUTHORIZED` | 401 | 未认证或 Token 无效 |
-| `FORBIDDEN` | 403 | 权限不足 |
-| `NOT_FOUND` | 404 | 资源不存在 |
-| `INTERNAL_ERROR` | 500 | 服务器内部错误 |
+| HTTP 状态码 | 错误码 | 说明 |
+|-----------|--------|------|
+| 400 | INVALID_REQUEST | 请求参数无效 |
+| 401 | UNAUTHORIZED | 未认证或 Token 无效 |
+| 403 | FORBIDDEN | 权限不足 |
+| 404 | NOT_FOUND | 资源不存在 |
+| 404 | INSTANCE_NOT_FOUND | 实例不存在 |
+| 429 | TOO_MANY_REQUESTS | 请求频率超限 |
+| 500 | INTERNAL_ERROR | 内部错误 |
+| 503 | SERVICE_UNAVAILABLE | 服务不可用 |
 
 ### 认证错误
 

@@ -1,0 +1,34 @@
+# MystiSql 测试环境 - MSSQL 2022 Express
+#
+# 注意:
+#   - 仅支持 linux/amd64，ARM 平台不可用
+#   - SA 密码必须满足复杂度要求（大小写+数字+特殊字符）
+#
+# 使用方法:
+#   podman-compose up -d
+#   podman-compose down -v
+
+services:
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: mystisql-mssql
+    platform: linux/amd64
+    restart: unless-stopped
+    user: root
+    ports:
+      - "11433:1433"
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Express
+      MSSQL_SA_PASSWORD: "Test123456!"
+    volumes:
+      - mssql-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'Test123456!' -Q 'SELECT 1' -b -o /dev/null"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+
+volumes:
+  mssql-data:

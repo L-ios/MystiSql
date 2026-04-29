@@ -1,0 +1,33 @@
+# MystiSql 测试环境 - MySQL 8.4
+#
+# 使用方法:
+#   podman-compose up -d
+#   podman-compose down -v    # -v 清除数据卷
+#
+# 等待就绪:
+#   podman-compose ps         # 查看 healthy 状态
+
+services:
+  mysql:
+    image: docker.io/library/mysql:8.4
+    container_name: mystisql-mysql
+    restart: unless-stopped
+    ports:
+      - "13306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: test123456
+      MYSQL_DATABASE: mystisql_test
+      MYSQL_USER: mystisql
+      MYSQL_PASSWORD: test123456
+    volumes:
+      - mysql-data:/var/lib/mysql
+    command: --mysql-native-password=ON
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-ptest123456"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  mysql-data:

@@ -1,6 +1,6 @@
 ## Why
 
-当前 SQL 验证器使用正则表达式，可被 SQL 注释、子查询、多语句等方式绕过。核心模块（query engine、rbac、oidc、health、blacklist）零测试覆盖，回归风险高。这两项改进可以独立于安全加固进行，且 SQL Parser 需要先做 POC 验证。
+当前 SQL 验证器使用正则表达式，可被 SQL 注释、子查询、多语句等方式绕过。核心模块（query engine、rbac、health、blacklist）零测试覆盖，回归风险高。这两项改进可以独立于安全加固进行，且 SQL Parser 需要先做 POC 验证。
 
 ## What Changes
 
@@ -15,7 +15,6 @@
 ### 核心模块测试补齐
 - `service/query/engine.go` — 查询路由、超时、验证器集成、审计集成
 - `service/rbac/` — 权限检查、角色分配、中间件
-- `service/auth/oidc/` — OIDC flow、token 验证、角色映射
 - `service/auth/blacklist.go` — TTL 清理、持久化
 - `service/health/` — 健康检查、事件通知、状态缓存
 - JDBC Transport 接口测试 — WS 模式 DatabaseMetaData 场景
@@ -35,7 +34,6 @@
 - `internal/service/validator/` — 新增 ast_validator.go
 - `internal/service/query/` — 新增 engine_test.go
 - `internal/service/rbac/` — 新增 rbac_test.go
-- `internal/service/auth/oidc/` — 新增 oidc_test.go
 - `internal/service/auth/blacklist.go` — 新增 blacklist_test.go
 - `internal/service/health/` — 新增 monitor_test.go
 - `jdbc/src/test/` — Transport 接口测试

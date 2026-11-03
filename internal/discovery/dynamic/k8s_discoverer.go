@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	discovery "MystiSql/internal/discovery"
 	"MystiSql/pkg/types"
 
 	"go.uber.org/zap"
@@ -46,6 +47,9 @@ type K8sDynamicDiscoverer struct {
 }
 
 type K8sDynamicDiscovererOption func(*K8sDynamicDiscoverer)
+
+// 接口断言：K8sDynamicDiscoverer 实现 discovery.InstanceDiscoverer（P2-011）
+var _ discovery.InstanceDiscoverer = (*K8sDynamicDiscoverer)(nil)
 
 func WithK8sLogger(logger *zap.Logger) K8sDynamicDiscovererOption {
 	return func(d *K8sDynamicDiscoverer) {
@@ -404,6 +408,50 @@ func (d *K8sDynamicDiscoverer) Refresh(ctx context.Context) error {
 
 	d.logger.Info("Refreshed instances", zap.Int("count", len(d.instances)))
 	return nil
+}
+
+// Name 实现 discovery.InstanceDiscoverer 接口。
+func (d *K8sDynamicDiscoverer) Name() string {
+	return "k8s-dynamic"
+}
+
+// Discover 返回当前已发现的实例快照（未运行时先执行一次刷新）。
+func (d *K8sDynamicDiscoverer) Discover(ctx context.Context) ([]*types.DatabaseInstance, error) {
+	if !d.isRunning() {
+		if err := d.Refresh(ctx); err != nil {
+			return nil, err
+		}
+	}
+	return d.GetInstances(), nil
+}
+
+// Watch 实现 discovery.InstanceDiscoverer 接口：
+// 启动监听（若未启动）并将内部事件转换为通用 DiscoveryEvent 通道。
+func (d *K8sDynamicDiscoverer) Watch(ctx context.Context) (<-chan discovery.DiscoveryEvent, error) {
+	if !d.isRunning() {
+		if err := d.Start(ctx); err != nil {
+			return nil, fmt.Errorf("failed to start k8s dynamic discoverer: %w", err)
+		}
+	}
+
+	out := make(chan discovery.DiscoveryEvent)
+	go func() {
+		defer close(out)
+		for ev := range d.GetEvents() {
+			out <- discovery.DiscoveryEvent{
+				Type:     discovery.DiscoveryEventType(ev.Type),
+				Instance: ev.Instance,
+			}
+		}
+	}()
+	return out, nil
+}
+
+// isRunning 返回发现器是否处于运行状态。
+func (d *K8sDynamicDiscoverer) isRunning() bool {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	return d.running
 }
 
 func isValidDatabaseType(dbType string) bool {

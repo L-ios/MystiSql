@@ -189,7 +189,7 @@
 - **描述**：E2E 测试目录存在但无测试文件。Makefile 中定义了 `e2e-setup/e2e-test/e2e-teardown` 目标。
 - **影响**：无端到端测试覆盖，完整的用户流程无法自动验证。
 - **建议修复方案**：编写关键流程的 E2E 测试（启动服务 -> 认证 -> 查询 -> 验证）。
-- **修复状态**：| **验证结果**：|
+- **修复状态**：✅ 无需修复（E2E 已迁移到 e2e-test/{backend,frontend}，Makefile 目标已更新；test/e2e 为残留空目录，可删除）  **验证结果**：✅
 
 ### P2-015: WebUI 无单元测试
 
@@ -205,7 +205,7 @@
 - **描述**：Playwright E2E 测试配置完整（5 个浏览器项目），但测试文件目录 `e2e-test/frontend/` 不存在。
 - **影响**：WebUI 完整用户流程无法自动验证。
 - **建议修复方案**：编写关键页面的 E2E 测试（Login -> Query -> Instances -> AuditLogs）。
-- **修复状态**：| **验证结果**：|
+- **修复状态**：✅ 无需修复（e2e-test/frontend 已存在，含 5 个 Playwright spec 与 test-helpers，文档描述过时）  **验证结果**：✅
 
 ### P2-017: Audit 文件权限硬编码
 

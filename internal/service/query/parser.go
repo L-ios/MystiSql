@@ -144,10 +144,10 @@ func (p *Parser) Validate(sql string) error {
 		}
 	}
 
-	// 检查是否包含注释
-	// TODO: implement comment detection
-	_ = strings.Contains(lowerSQL, "--")
-	_ = strings.Contains(lowerSQL, "/*")
+	// 检查是否包含注释：注释可能掩盖真实意图，拒绝包含 SQL 注释的语句
+	if strings.Contains(lowerSQL, "--") || strings.Contains(lowerSQL, "/*") {
+		return fmt.Errorf("SQL comments are not allowed")
+	}
 
 	return nil
 }

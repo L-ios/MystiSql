@@ -344,12 +344,12 @@ func TestParser_Validate(t *testing.T) {
 		{
 			name:    "Contains -- comment",
 			sql:     "SELECT * FROM users -- comment",
-			wantErr: false,
+			wantErr: true,
 		},
 		{
 			name:    "Contains /* comment",
 			sql:     "SELECT * FROM users /* comment */",
-			wantErr: false,
+			wantErr: true,
 		},
 		{
 			name:    "DELETE without WHERE",

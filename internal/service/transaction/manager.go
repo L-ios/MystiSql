@@ -326,9 +326,44 @@ func (tm *TransactionManager) setIsolationLevel(ctx context.Context, tx *Transac
 		return nil
 	}
 
-	query := fmt.Sprintf("SET TRANSACTION ISOLATION LEVEL %s", levelStr)
+	// 根据数据库类型生成对应的隔离级别语法：
+	// - PostgreSQL: SET SESSION CHARACTERISTICS AS TRANSACTION ...
+	// - Oracle: 仅支持 SERIALIZABLE / READ COMMITTED（ALTER SESSION）
+	// - 其余（MySQL 等）: SET SESSION TRANSACTION ISOLATION LEVEL ...
+	dbType := tm.connectionDatabaseType(tx.Connection)
+	var query string
+	switch dbType {
+	case types.DatabaseTypePostgreSQL:
+		query = fmt.Sprintf("SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL %s", levelStr)
+	case types.DatabaseTypeOracle:
+		oracleLevel := "READ COMMITTED"
+		if tx.IsolationLevel == types.IsolationLevelSerializable {
+			oracleLevel = "SERIALIZABLE"
+		} else if tx.IsolationLevel != types.IsolationLevelReadCommitted {
+			return fmt.Errorf("oracle 不支持隔离级别 %s，仅支持 READ COMMITTED / SERIALIZABLE", tx.IsolationLevel)
+		}
+		query = fmt.Sprintf("ALTER SESSION SET ISOLATION_LEVEL = %s", oracleLevel)
+	default:
+		query = fmt.Sprintf("SET SESSION TRANSACTION ISOLATION LEVEL %s", levelStr)
+	}
+
 	_, err := tx.Connection.Exec(ctx, query)
 	return err
+}
+
+// connectionDatabaseType 从连接中提取数据库类型；无法识别时返回空字符串。
+func (tm *TransactionManager) connectionDatabaseType(conn pool.PooledConnection) types.DatabaseType {
+	instanceGetter, ok := conn.(interface {
+		Instance() *types.DatabaseInstance
+	})
+	if !ok {
+		return ""
+	}
+	instance := instanceGetter.Instance()
+	if instance == nil {
+		return ""
+	}
+	return instance.Type
 }
 
 func (tm *TransactionManager) GetActiveTransactionCount() int {

@@ -10,6 +10,8 @@ import (
 	"MystiSql/pkg/types"
 )
 
+// PooledConnection 连接池对外暴露的连接接口。
+// 可选实现 Instance() 用于让上层获知连接对应的数据库实例信息。
 type PooledConnection interface {
 	Query(ctx context.Context, sql string) (*types.QueryResult, error)
 	Exec(ctx context.Context, sql string) (*types.ExecResult, error)
@@ -196,5 +198,15 @@ func (w *pooledConnectionWrapper) Exec(ctx context.Context, sql string) (*types.
 
 func (w *pooledConnectionWrapper) Close() error {
 	w.pool.ReturnConnection(w.conn)
+	return nil
+}
+
+// Instance 返回底层连接对应的数据库实例信息（可能为 nil，取决于驱动实现）。
+func (w *pooledConnectionWrapper) Instance() *types.DatabaseInstance {
+	if instanceGetter, ok := w.conn.(interface {
+		Instance() *types.DatabaseInstance
+	}); ok {
+		return instanceGetter.Instance()
+	}
 	return nil
 }

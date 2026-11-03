@@ -19,6 +19,7 @@ import (
 	"MystiSql/internal/service/audit"
 	"MystiSql/internal/service/auth"
 	"MystiSql/internal/service/batch"
+	"MystiSql/internal/service/health"
 	"MystiSql/internal/service/query"
 	"MystiSql/internal/service/rbac"
 	"MystiSql/internal/service/transaction"
@@ -53,6 +54,7 @@ type Server struct {
 	transactionHandlers *TransactionHandlers
 	batchHandlers       *BatchHandlers
 	validatorHandlers   *ValidatorHandlers
+	haHandlers          *HAHandlers
 	auditHandlers       *AuditHandlers
 	rbacService         *rbac.RBACService
 	rbacHandlers        *RBACHandlers
@@ -81,6 +83,18 @@ func NewServer(config *types.ServerConfig, websocketConfig *types.WebSocketConfi
 // SetCORSOrigins 设置允许的 CORS 来源列表
 func (s *Server) SetCORSOrigins(origins []string) {
 	s.corsOrigins = origins
+}
+
+// haHealthCheckConfig 返回 HA 健康检查默认配置。
+// 后续可从 ServerConfig 扩展读取，当前使用保守默认值。
+func (s *Server) haHealthCheckConfig() types.HealthCheckConfig {
+	return types.HealthCheckConfig{
+		Enabled:           true,
+		Interval:          30 * time.Second,
+		Timeout:           5 * time.Second,
+		FailureThreshold:  3,
+		RecoveryThreshold: 2,
+	}
 }
 
 // Setup 初始化服务器
@@ -120,6 +134,19 @@ func (s *Server) Setup() error {
 		}
 		s.wsHandler = wsapi.NewWebSocketHandler(s.engine, s.authService, s.logger, cfg)
 	}
+
+	// 初始化 HA 处理器：基于 registry + engine 构建增强健康检查与拓扑管理
+	checkFunc := func(ctx context.Context, instance *types.DatabaseInstance) error {
+		_, err := s.engine.GetInstanceHealth(ctx, instance.Name)
+		return err
+	}
+	haChecker := health.NewEnhancedHealthChecker(
+		s.haHealthCheckConfig(),
+		s.registry,
+		checkFunc,
+		s.logger,
+	)
+	s.haHandlers = NewHAHandlers(haChecker, nil, s.logger)
 
 	// 初始化验证器处理器
 	if s.validatorService != nil {
@@ -259,6 +286,31 @@ func (s *Server) setupRoutes() {
 				validatorGroup.POST("/whitelist", s.validatorHandlers.UpdateWhitelist)
 				validatorGroup.GET("/blacklist", s.validatorHandlers.GetBlacklist)
 				validatorGroup.POST("/blacklist", s.validatorHandlers.UpdateBlacklist)
+				validatorGroup.POST("/validate", s.validatorHandlers.ValidateQuery)
+			}
+		}
+
+		// 添加 HA 路由（实例健康状态、拓扑、故障转移）
+		// 注意：/api/v1/instances/:name/health 已由 handlers 注册，
+		// 这里只注册 HA 专属子路由，避免 gin 路由冲突。
+		if s.haHandlers != nil {
+			instances := v1.Group("/instances")
+			{
+				instances.GET("/health", s.haHandlers.GetAllInstancesHealth)
+				instances.GET("/healthy", s.haHandlers.GetHealthyInstances)
+				instances.GET("/unhealthy", s.haHandlers.GetUnhealthyInstances)
+				instances.POST("/:name/health/check", s.haHandlers.ForceHealthCheck)
+			}
+
+			ha := v1.Group("/ha")
+			{
+				ha.GET("/status", s.haHandlers.GetHAStatus)
+				ha.GET("/topology", s.haHandlers.GetAllTopologies)
+				ha.GET("/topology/:name", s.haHandlers.GetTopology)
+				ha.POST("/failover", s.haHandlers.ManualFailover)
+				ha.POST("/failover/auto", s.haHandlers.AutoFailover)
+				ha.POST("/topology/:name/slaves", s.haHandlers.AddSlave)
+				ha.DELETE("/topology/:name/slaves/:slaveName", s.haHandlers.RemoveSlave)
 			}
 		}
 

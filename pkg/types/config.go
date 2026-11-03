@@ -63,6 +63,10 @@ type ServerConfig struct {
 	Host string `json:"host" yaml:"host"`
 	Port int    `json:"port" yaml:"port"`
 	Mode string `json:"mode" yaml:"mode"`
+
+	// TLS 配置（可选）。CertFile 与 KeyFile 同时设置时启用 HTTPS。
+	CertFile string `json:"certFile,omitempty" yaml:"certFile,omitempty"`
+	KeyFile  string `json:"keyFile,omitempty" yaml:"keyFile,omitempty"`
 }
 
 // HealthConfig 定义健康监控配置

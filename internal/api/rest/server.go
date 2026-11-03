@@ -356,6 +356,13 @@ func (s *Server) Start() error {
 
 	// 启动服务器（非阻塞）
 	go func() {
+		// 配置了证书时启用 HTTPS（P3-003）
+		if s.config.CertFile != "" && s.config.KeyFile != "" {
+			if err := s.server.ListenAndServeTLS(s.config.CertFile, s.config.KeyFile); err != nil && err != http.ErrServerClosed {
+				s.logger.Fatal("Failed to start TLS server", zap.Error(err))
+			}
+			return
+		}
 		if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			s.logger.Fatal("Failed to start server", zap.Error(err))
 		}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Card, Row, Col, Statistic, Typography, Spin, Tag } from 'antd'
 import {
   DatabaseOutlined,
@@ -15,31 +15,30 @@ export default function Dashboard() {
   const { instances, setInstances, loading, setLoading } = useInstanceStore()
   const [uptime, setUptime] = useState(0)
 
-  useEffect(() => {
-    fetchInstances()
-    fetchUptime()
-  }, [])
-
-  const fetchUptime = async () => {
+  const fetchUptime = useCallback(async () => {
     try {
       const response = await apiClient.getHealth()
       setUptime(response.uptime)
     } catch {
       console.error('Failed to fetch server health')
     }
-  }
+  }, [])
 
-  const fetchInstances = async () => {
-    setLoading(true)
+  const fetchInstances = useCallback(async () => {
     try {
       const response = await apiClient.getInstances()
       setInstances(response.instances)
     } catch {
       console.error('Failed to fetch instances')
-    } finally {
-      setLoading(false)
     }
-  }
+  }, [setInstances])
+
+  useEffect(() => {
+    setLoading(true)
+    Promise.all([fetchInstances(), fetchUptime()]).finally(() =>
+      setLoading(false)
+    )
+  }, [fetchInstances, fetchUptime, setLoading])
 
   const healthyCount = instances.filter((i) => i.status === 'healthy').length
   const unhealthyCount = instances.filter((i) => i.status !== 'healthy').length

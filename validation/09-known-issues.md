@@ -281,7 +281,7 @@
 - **描述**：JWT 中未设置 `aud`（audience）和 `iss`（issuer）claims。
 - **影响**：无法区分不同服务的 Token。
 - **建议修复方案**：在配置中添加 audience 和 issuer 字段。
-- **修复状态**：| **验证结果**：|
+- **修复状态**：✅ 已修复（e5f74eb：SetIssuerAudience 可选 iss/aud，验证强制校验）  **验证结果**：✅
 
 ### P3-008: Elasticsearch Close 不完整
 

@@ -297,7 +297,7 @@
 - **描述**：`Ping()` 方法通过执行 `GET health-check-key` 来检查健康，如果 key 不存在会产生错误日志。
 - **影响**：每次心跳都会产生一次无意义的 GET 操作。
 - **建议修复方案**：使用 etcd 原生的 KV 端点健康检查或 `client.Close()` + `client.Connect()` 方式。
-- **修复状态**：| **验证结果**：|
+- **修复状态**：✅ 已修复（1ed68e2：改用 etcd 原生 Status 维护 API）  **验证结果**：✅
 
 ### P3-010: Query pool config 硬编码
 
@@ -305,7 +305,7 @@
 - **描述**：连接池参数（MaxConnections=10, MinConnections=2 等）在代码中硬编码，不可通过外部配置修改。
 - **影响**：无法根据实际负载调整连接池大小。
 - **建议修复方案**：从全局配置文件读取连接池参数。
-- **修复状态**：| **验证结果**：|
+- **修复状态**：✅ 已修复（fd83d5d：Engine.SetPoolConfig + serve 注入全局配置）  **验证结果**：✅
 
 ### P3-011: 无 Discovery Consul/etcd/DNS 发现
 

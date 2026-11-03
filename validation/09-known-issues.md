@@ -249,7 +249,7 @@
 - **描述**：代码中未找到 TLS/HTTPS 相关配置。REST 服务器始终以 HTTP 启动。
 - **影响**：生产环境必须依赖外部反向代理（Nginx/Caddy）提供 HTTPS。
 - **建议修复方案**：在配置中添加 TLS 证书路径和密钥路径。
-- **修复状态**：| **验证结果**：|
+- **修复状态**：✅ 已修复（05d8fc1：ServerConfig certFile/keyFile + ListenAndServeTLS）  **验证结果**：✅
 
 ### P3-004: 无 Content-Security-Policy header
 
@@ -265,7 +265,7 @@
 - **描述**：所有查询无论类型、敏感度、执行时间都同等记录。
 - **影响**：高频查询可能产生大量日志，存储压力大。
 - **建议修复方案**：添加日志级别配置（如仅记录 DDL/DELETE/DROP）。
-- **修复状态**：| **验证结果**：|
+- **修复状态**：✅ 已修复（e8aa19f+010c8f2：audit.logLevel 四级过滤）  **验证结果**：✅
 
 ### P3-006: Auth 无 refresh token 机制
 

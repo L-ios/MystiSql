@@ -120,6 +120,7 @@ var serveCmd = &cobra.Command{
 				LogFile:       cfg.Audit.LogFile,
 				RetentionDays: cfg.Audit.RetentionDays,
 				BufferSize:    1000,
+				LogLevel:      cfg.Audit.LogLevel,
 			}
 			var err error
 			auditService, err = audit.NewAuditService(auditConfig, logger)

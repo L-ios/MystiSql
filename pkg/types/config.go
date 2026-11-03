@@ -103,6 +103,9 @@ type AuditConfig struct {
 	Enabled       bool   `json:"enabled" yaml:"enabled"`
 	LogFile       string `json:"logFile" yaml:"logFile"`
 	RetentionDays int    `json:"retentionDays" yaml:"retentionDays"`
+
+	// LogLevel 日志级别：all/sensitive/write/ddl，默认 all
+	LogLevel string `json:"logLevel,omitempty" yaml:"logLevel,omitempty"`
 }
 
 // ValidatorConfig 定义验证器配置

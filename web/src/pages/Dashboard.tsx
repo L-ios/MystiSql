@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Card, Row, Col, Statistic, Typography, Spin, Tag } from 'antd'
 import {
   DatabaseOutlined,
@@ -13,10 +13,21 @@ const { Title } = Typography
 
 export default function Dashboard() {
   const { instances, setInstances, loading, setLoading } = useInstanceStore()
+  const [uptime, setUptime] = useState(0)
 
   useEffect(() => {
     fetchInstances()
+    fetchUptime()
   }, [])
+
+  const fetchUptime = async () => {
+    try {
+      const response = await apiClient.getHealth()
+      setUptime(response.uptime)
+    } catch {
+      console.error('Failed to fetch server health')
+    }
+  }
 
   const fetchInstances = async () => {
     setLoading(true)
@@ -80,7 +91,7 @@ export default function Dashboard() {
           <Card>
             <Statistic
               title="在线时长"
-              value={0}
+              value={Math.floor(uptime / 60)}
               suffix="分钟"
               prefix={<ClockCircleOutlined />}
             />

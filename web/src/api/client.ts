@@ -8,6 +8,7 @@ import type {
   ExecResponse,
   TokenInfoResponse,
   InstanceHealthResponse,
+  ServerHealthResponse,
   PoolStatsResponse,
   AuditLogsResponse,
   AuditStatsResponse,
@@ -92,6 +93,13 @@ class ApiClient {
 
   async getInstances(): Promise<InstancesListResponse> {
     const response = await this.client.get<InstancesListResponse>('/instances')
+    return response.data
+  }
+
+  /** 获取服务健康状态（含 uptime，单位秒） */
+  async getHealth(): Promise<ServerHealthResponse> {
+    // /health 在 API 前缀之外，需要绝对路径
+    const response = await this.client.get<ServerHealthResponse>('/health')
     return response.data
   }
 

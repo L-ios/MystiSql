@@ -133,6 +133,10 @@ func (h *HAHandlers) GetUnhealthyInstances(c *gin.Context) {
 // GetHAStatus 获取高可用整体状态
 // GET /api/v1/ha/status
 func (h *HAHandlers) GetHAStatus(c *gin.Context) {
+	if h.topologyManager == nil {
+		respondTopologyUnavailable(c)
+		return
+	}
 	stats := h.healthChecker.GetStats()
 	topologyStatus := h.topologyManager.GetAllTopologyStatus()
 
@@ -147,6 +151,10 @@ func (h *HAHandlers) GetHAStatus(c *gin.Context) {
 // GetTopology 获取单个拓扑状态
 // GET /api/v1/ha/topology/:name
 func (h *HAHandlers) GetTopology(c *gin.Context) {
+	if h.topologyManager == nil {
+		respondTopologyUnavailable(c)
+		return
+	}
 	topologyName := c.Param("name")
 
 	status, err := h.topologyManager.GetTopologyStatus(topologyName)
@@ -166,6 +174,10 @@ func (h *HAHandlers) GetTopology(c *gin.Context) {
 // GetAllTopologies 获取所有拓扑状态
 // GET /api/v1/ha/topology
 func (h *HAHandlers) GetAllTopologies(c *gin.Context) {
+	if h.topologyManager == nil {
+		respondTopologyUnavailable(c)
+		return
+	}
 	status := h.topologyManager.GetAllTopologyStatus()
 
 	c.JSON(http.StatusOK, gin.H{
@@ -183,6 +195,10 @@ type FailoverRequest struct {
 // ManualFailover 手动故障转移
 // POST /api/v1/ha/failover
 func (h *HAHandlers) ManualFailover(c *gin.Context) {
+	if h.topologyManager == nil {
+		respondTopologyUnavailable(c)
+		return
+	}
 	var req FailoverRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, NewErrorResponse(
@@ -227,6 +243,10 @@ func (h *HAHandlers) ManualFailover(c *gin.Context) {
 // AutoFailover 自动故障转移
 // POST /api/v1/ha/failover/auto
 func (h *HAHandlers) AutoFailover(c *gin.Context) {
+	if h.topologyManager == nil {
+		respondTopologyUnavailable(c)
+		return
+	}
 	topologyName := c.Query("topology")
 	if topologyName == "" {
 		c.JSON(http.StatusBadRequest, NewErrorResponse(
@@ -272,6 +292,10 @@ type AddSlaveRequest struct {
 // AddSlave 添加从库
 // POST /api/v1/ha/topology/:name/slaves
 func (h *HAHandlers) AddSlave(c *gin.Context) {
+	if h.topologyManager == nil {
+		respondTopologyUnavailable(c)
+		return
+	}
 	topologyName := c.Param("name")
 
 	var req AddSlaveRequest
@@ -329,6 +353,10 @@ func (h *HAHandlers) AddSlave(c *gin.Context) {
 // RemoveSlave 移除从库
 // DELETE /api/v1/ha/topology/:name/slaves/:slaveName
 func (h *HAHandlers) RemoveSlave(c *gin.Context) {
+	if h.topologyManager == nil {
+		respondTopologyUnavailable(c)
+		return
+	}
 	topologyName := c.Param("name")
 	slaveName := c.Param("slaveName")
 
@@ -405,4 +433,12 @@ func RegisterHARoutes(router *gin.RouterGroup, haHandlers *HAHandlers) {
 		ha.POST("/topology/:name/slaves", haHandlers.AddSlave)
 		ha.DELETE("/topology/:name/slaves/:slaveName", haHandlers.RemoveSlave)
 	}
+}
+
+// respondTopologyUnavailable 拓扑管理器未配置时返回 503。
+func respondTopologyUnavailable(c *gin.Context) {
+	c.JSON(http.StatusServiceUnavailable, NewErrorResponse(
+		"TOPOLOGY_UNAVAILABLE",
+		"拓扑管理服务未配置，HA 拓扑相关接口不可用",
+	))
 }

@@ -19,6 +19,16 @@ func SecurityHeadersMiddleware() gin.HandlerFunc {
 		c.Header("X-Frame-Options", "DENY")
 		c.Header("X-XSS-Protection", "1; mode=block")
 		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
+		// CSP：同源资源 + 内联样式（antd 需要）+ Monaco worker blob
+		c.Header("Content-Security-Policy",
+			"default-src 'self'; "+
+				"script-src 'self' 'unsafe-inline' blob:; "+
+				"style-src 'self' 'unsafe-inline'; "+
+				"img-src 'self' data: blob:; "+
+				"font-src 'self' data:; "+
+				"connect-src 'self' ws: wss:; "+
+				"worker-src 'self' blob:; "+
+				"frame-ancestors 'none'")
 		c.Next()
 	}
 }

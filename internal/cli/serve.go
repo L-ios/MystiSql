@@ -10,6 +10,10 @@ import (
 
 	"MystiSql/internal/api/rest"
 	"MystiSql/internal/connection"
+	"MystiSql/internal/connection/clickhouse"
+	"MystiSql/internal/connection/elasticsearch"
+	"MystiSql/internal/connection/etcd"
+	"MystiSql/internal/connection/mssql"
 	"MystiSql/internal/connection/mysql"
 	"MystiSql/internal/connection/oracle"
 	"MystiSql/internal/connection/postgresql"
@@ -66,6 +70,10 @@ var serveCmd = &cobra.Command{
 		driverReg.RegisterDriver(types.DatabaseTypeOracle, oracle.NewFactory())
 		driverReg.RegisterDriver(types.DatabaseTypeRedis, redis.NewFactory())
 		driverReg.RegisterDriver(types.DatabaseTypeSQLite, sqlite.NewFactory())
+		driverReg.RegisterDriver(types.DatabaseTypeClickHouse, clickhouse.NewFactory())
+		driverReg.RegisterDriver(types.DatabaseTypeMSSQL, mssql.NewFactory())
+		driverReg.RegisterDriver(types.DatabaseTypeElasticsearch, elasticsearch.NewFactory())
+		driverReg.RegisterDriver(types.DatabaseTypeEtcd, etcd.NewFactory())
 
 		engine := query.NewEngine(GetRegistry(), driverReg)
 

@@ -200,6 +200,20 @@ public class MystiSqlConnection implements Connection {
     public boolean isSsl() { return ssl; }
     public Transport getTransport() { return transport; }
     public String getTransportType() { return transportType; }
+
+    /**
+     * 替换底层 Transport（仅供测试注入 mock 使用，生产代码不应调用）。
+     */
+    void setTransportForTesting(Transport transport) {
+        java.lang.reflect.Field field;
+        try {
+            field = MystiSqlConnection.class.getDeclaredField("transport");
+            field.setAccessible(true);
+            field.set(this, transport);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException("failed to inject transport for testing", e);
+        }
+    }
     
     /**
      * @deprecated Use {@link #getTransport()} instead. 

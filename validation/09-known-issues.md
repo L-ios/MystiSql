@@ -165,7 +165,7 @@
 - **描述**：`k8s.Discoverer` 实现了 `discovery.InstanceDiscoverer` 接口，但 `dynamic.K8sDynamicDiscoverer` 未实现此接口。
 - **影响**：两个 K8s 发现器无法统一管理，增加使用复杂度。
 - **建议修复方案**：统一接口或合并为一个实现。
-- **修复状态**：| **验证结果**：|
+- **修复状态**：✅ 已修复（e95a20c：补 Name/Discover/Watch 适配 + 接口断言）  **验证结果**：✅
 
 ### P2-012: ClickHouse 重复 base 逻辑
 

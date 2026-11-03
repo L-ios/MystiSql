@@ -3,10 +3,12 @@ package batch
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	"MystiSql/internal/connection/pool"
+	"MystiSql/internal/service/audit"
 	"MystiSql/internal/service/transaction"
 	"MystiSql/pkg/types"
 
@@ -52,6 +54,7 @@ type BatchService struct {
 	poolManager *pool.ConnectionPoolManager
 	config      *BatchConfig
 	logger      *zap.Logger
+	auditSvc    *audit.AuditService
 }
 
 func NewBatchService(txManager *transaction.TransactionManager, poolManager *pool.ConnectionPoolManager, config *BatchConfig, logger *zap.Logger) *BatchService {
@@ -65,6 +68,12 @@ func NewBatchService(txManager *transaction.TransactionManager, poolManager *poo
 		config:      config,
 		logger:      logger,
 	}
+}
+
+// SetAuditService 设置审计服务（可选）。
+// 设置后批量执行中的每条 SQL 都会记录审计日志。
+func (s *BatchService) SetAuditService(service *audit.AuditService) {
+	s.auditSvc = service
 }
 
 type BatchRequest struct {
@@ -268,7 +277,37 @@ func (s *BatchService) executeSingleQuery(ctx context.Context, req *BatchRequest
 	}
 
 	result.ExecutionTime = time.Since(start).Milliseconds()
+
+	// 审计：每条批量 SQL 单独记录（P2-007）
+	s.logAudit(ctx, req, sql, &result)
+
 	return result
+}
+
+// logAudit 将单条批量 SQL 的执行结果写入审计日志（若已配置审计服务）。
+func (s *BatchService) logAudit(ctx context.Context, req *BatchRequest, sql string, result *BatchResult) {
+	if s.auditSvc == nil || !s.auditSvc.IsEnabled() {
+		return
+	}
+
+	auditLog := audit.NewAuditLog("batch-user", "", req.Instance, "", sql)
+	auditLog.SetQueryInfo(queryTypeOf(sql), result.RowsAffected, result.ExecutionTime)
+	if result.Success {
+		auditLog.SetSuccess()
+	} else {
+		auditLog.SetError(result.Error)
+	}
+
+	_ = s.auditSvc.Log(ctx, auditLog)
+}
+
+// queryTypeOf 从 SQL 首个单词推断语句类型（用于审计分类）。
+func queryTypeOf(sql string) string {
+	fields := strings.Fields(sql)
+	if len(fields) == 0 {
+		return ""
+	}
+	return strings.ToUpper(fields[0])
 }
 
 func (s *BatchService) ExecuteBatchWithNewTransaction(ctx context.Context, req *BatchRequest) (*BatchResponse, error) {

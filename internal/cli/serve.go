@@ -76,6 +76,16 @@ var serveCmd = &cobra.Command{
 		driverReg.RegisterDriver(types.DatabaseTypeEtcd, etcd.NewFactory())
 
 		engine := query.NewEngine(GetRegistry(), driverReg)
+		// 接入全局连接池配置（若有）
+		poolConf := &connection.PoolConfig{
+			MaxConnections:    cfg.Pool.MaxConnections,
+			MinConnections:    cfg.Pool.MinConnections,
+			MaxIdleTime:       cfg.Pool.MaxIdleTime,
+			MaxLifetime:       cfg.Pool.MaxLifetime,
+			ConnectionTimeout: cfg.Pool.ConnectionTimeout,
+			PingInterval:      cfg.Pool.PingInterval,
+		}
+		engine.SetPoolConfig(poolConf)
 
 		// 创建 auth service (如果启用)
 		var authService *auth.AuthService

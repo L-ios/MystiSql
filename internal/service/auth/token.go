@@ -50,6 +50,10 @@ func (g *TokenGenerator) GenerateToken(userID, role string) (string, error) {
 	}
 
 	now := time.Now()
+	tokenID, err := generateTokenID()
+	if err != nil {
+		return "", err
+	}
 	claims := TokenClaims{
 		UserID: userID,
 		Role:   role,
@@ -57,7 +61,7 @@ func (g *TokenGenerator) GenerateToken(userID, role string) (string, error) {
 			ExpiresAt: jwt.NewNumericDate(now.Add(g.tokenDuration)),
 			IssuedAt:  jwt.NewNumericDate(now),
 			NotBefore: jwt.NewNumericDate(now),
-			ID:        generateTokenID(),
+			ID:        tokenID,
 		},
 	}
 
@@ -100,8 +104,10 @@ func (g *TokenGenerator) ValidateToken(tokenString string) (*TokenClaims, error)
 	return claims, nil
 }
 
-func generateTokenID() string {
+func generateTokenID() (string, error) {
 	b := make([]byte, 16)
-	rand.Read(b)
-	return fmt.Sprintf("%x", b)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("failed to generate token ID: %w", err)
+	}
+	return fmt.Sprintf("%x", b), nil
 }

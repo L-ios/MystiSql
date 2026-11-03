@@ -233,3 +233,49 @@ func TestTokenClaims(t *testing.T) {
 		t.Error("Token is already expired")
 	}
 }
+
+func TestTokenGenerator_IssuerAudience(t *testing.T) {
+	gen, err := NewTokenGenerator("test-secret", time.Hour)
+	if err != nil {
+		t.Fatalf("NewTokenGenerator failed: %v", err)
+	}
+
+	// 未设置时不携带 iss/aud，验证照常通过（向后兼容）
+	token, err := gen.GenerateToken("user1", "admin")
+	if err != nil {
+		t.Fatalf("GenerateToken failed: %v", err)
+	}
+	claims, err := gen.ValidateToken(token)
+	if err != nil {
+		t.Fatalf("ValidateToken failed: %v", err)
+	}
+	if claims.Issuer != "" || len(claims.Audience) != 0 {
+		t.Errorf("unexpected iss/aud claims: %v/%v", claims.Issuer, claims.Audience)
+	}
+
+	// 设置后签发与校验均生效，且能拒绝错误 issuer 的 token
+	gen.SetIssuerAudience("mystisql-gateway", "mystisql-clients")
+
+	token2, err := gen.GenerateToken("user1", "admin")
+	if err != nil {
+		t.Fatalf("GenerateToken failed: %v", err)
+	}
+	claims2, err := gen.ValidateToken(token2)
+	if err != nil {
+		t.Fatalf("ValidateToken failed: %v", err)
+	}
+	if claims2.Issuer != "mystisql-gateway" {
+		t.Errorf("Issuer = %v, want mystisql-gateway", claims2.Issuer)
+	}
+	if len(claims2.Audience) != 1 || claims2.Audience[0] != "mystisql-clients" {
+		t.Errorf("Audience = %v, want [mystisql-clients]", claims2.Audience)
+	}
+
+	// 其他生成器（不同 issuer）签发的 token 应被拒绝
+	other, _ := NewTokenGenerator("test-secret", time.Hour)
+	other.SetIssuerAudience("other-service", "mystisql-clients")
+	foreignToken, _ := other.GenerateToken("user1", "admin")
+	if _, err := gen.ValidateToken(foreignToken); err == nil {
+		t.Error("token with wrong issuer should be rejected")
+	}
+}

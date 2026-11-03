@@ -25,6 +25,8 @@ type TokenClaims struct {
 type TokenGenerator struct {
 	secretKey     []byte
 	tokenDuration time.Duration
+	issuer        string
+	audience      string
 }
 
 func NewTokenGenerator(secretKey string, tokenDuration time.Duration) (*TokenGenerator, error) {
@@ -39,6 +41,13 @@ func NewTokenGenerator(secretKey string, tokenDuration time.Duration) (*TokenGen
 		secretKey:     []byte(secretKey),
 		tokenDuration: tokenDuration,
 	}, nil
+}
+
+// SetIssuerAudience 设置 JWT 的 issuer/audience claims（可选）。
+// 设置后签发的 token 会携带这些 claims，且验证时会强制校验。
+func (g *TokenGenerator) SetIssuerAudience(issuer, audience string) {
+	g.issuer = issuer
+	g.audience = audience
 }
 
 func (g *TokenGenerator) GenerateToken(userID, role string) (string, error) {
@@ -64,6 +73,12 @@ func (g *TokenGenerator) GenerateToken(userID, role string) (string, error) {
 			ID:        tokenID,
 		},
 	}
+	if g.issuer != "" {
+		claims.Issuer = g.issuer
+	}
+	if g.audience != "" {
+		claims.Audience = []string{g.audience}
+	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString(g.secretKey)
@@ -79,12 +94,20 @@ func (g *TokenGenerator) ValidateToken(tokenString string) (*TokenClaims, error)
 		return nil, ErrInvalidToken
 	}
 
+	parserOptions := []jwt.ParserOption{}
+	if g.issuer != "" {
+		parserOptions = append(parserOptions, jwt.WithIssuer(g.issuer))
+	}
+	if g.audience != "" {
+		parserOptions = append(parserOptions, jwt.WithAudience(g.audience))
+	}
+
 	token, err := jwt.ParseWithClaims(tokenString, &TokenClaims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		return g.secretKey, nil
-	})
+	}, parserOptions...)
 
 	if err != nil {
 		if errors.Is(err, jwt.ErrTokenExpired) {

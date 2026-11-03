@@ -67,6 +67,10 @@ type ServerConfig struct {
 	// TLS 配置（可选）。CertFile 与 KeyFile 同时设置时启用 HTTPS。
 	CertFile string `json:"certFile,omitempty" yaml:"certFile,omitempty"`
 	KeyFile  string `json:"keyFile,omitempty" yaml:"keyFile,omitempty"`
+
+	// RateLimitPerMinute 每分钟每客户端最大请求数（可选）。
+	// 0 表示不启用限流；正值启用滑动窗口限流（P2-010）。
+	RateLimitPerMinute int `json:"rateLimitPerMinute,omitempty" yaml:"rateLimitPerMinute,omitempty"`
 }
 
 // HealthConfig 定义健康监控配置

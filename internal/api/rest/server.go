@@ -191,6 +191,13 @@ func (s *Server) Setup() error {
 	s.router.Use(LoggerMiddleware(s.logger))    // 日志记录
 	s.router.Use(CORSMiddleware(s.corsOrigins)) // CORS 支持
 
+	// 速率限制（可选）：RateLimitPerMinute > 0 时启用
+	if s.config.RateLimitPerMinute > 0 {
+		s.router.Use(middleware.RateLimit(middleware.RateLimitConfig{
+			RequestsPerMinute: s.config.RateLimitPerMinute,
+		}))
+	}
+
 	// 设置路由
 	s.setupRoutes()
 

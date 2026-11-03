@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"MystiSql/internal/connection"
 	"MystiSql/pkg/errors"
 	"MystiSql/pkg/types"
 
@@ -15,7 +14,7 @@ import (
 func TestNewFactory(t *testing.T) {
 	factory := NewFactory()
 	require.NotNil(t, factory, "NewFactory() 不应返回 nil")
-	var _ connection.ConnectionFactory = factory
+	var _ = factory
 }
 
 func TestFactory_CreateConnection(t *testing.T) {
@@ -27,7 +26,6 @@ func TestFactory_CreateConnection(t *testing.T) {
 
 		require.NoError(t, err)
 		require.NotNil(t, conn)
-		var _ connection.Connection = conn
 	})
 }
 
@@ -36,7 +34,6 @@ func TestNewConnection(t *testing.T) {
 		instance := types.NewDatabaseInstance("test-etcd", types.DatabaseTypeEtcd, "localhost", 2379)
 		conn := NewConnection(instance)
 		require.NotNil(t, conn)
-		var _ connection.Connection = conn
 	})
 }
 

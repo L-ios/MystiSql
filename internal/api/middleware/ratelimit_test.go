@@ -58,7 +58,9 @@ func TestRateLimit_WindowSlides(t *testing.T) {
 	limiter := newRateLimiter(2, 50*time.Millisecond)
 
 	now := time.Now()
-	if !limiter.allow("k", now) || !limiter.allow("k", now) {
+	first := limiter.allow("k", now)
+	second := limiter.allow("k", now)
+	if !first || !second {
 		t.Fatal("first two requests should be allowed")
 	}
 	if limiter.allow("k", now) {

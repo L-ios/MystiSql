@@ -52,26 +52,6 @@ func (v *SQLValidatorImpl) Validate(ctx context.Context, instance, query string)
 	}, nil
 }
 
-func (v *SQLValidatorImpl) isDeleteWithoutWhere(query string) bool {
-	statements := v.tokenizer.Tokenize(query)
-	for _, stmt := range statements {
-		if stmt.Type == "DELETE" {
-			return !v.tokenizer.hasKeyword(stmt.Content, "WHERE")
-		}
-	}
-	return false
-}
-
-func (v *SQLValidatorImpl) isUpdateWithoutWhere(query string) bool {
-	statements := v.tokenizer.Tokenize(query)
-	for _, stmt := range statements {
-		if stmt.Type == "UPDATE" {
-			return !v.tokenizer.hasKeyword(stmt.Content, "WHERE")
-		}
-	}
-	return false
-}
-
 func (v *SQLValidatorImpl) GetQueryType(query string) string {
 	statements := v.tokenizer.Tokenize(query)
 	if len(statements) == 0 {

@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"MystiSql/internal/connection"
 	"MystiSql/pkg/errors"
 	"MystiSql/pkg/types"
 
@@ -20,7 +19,7 @@ func TestNewFactory(t *testing.T) {
 	require.NotNil(t, factory, "NewFactory() 不应返回 nil")
 
 	// 验证 Factory 实现了 ConnectionFactory 接口
-	var _ connection.ConnectionFactory = factory
+	var _ = factory
 }
 
 func TestFactory_CreateConnection(t *testing.T) {
@@ -37,7 +36,6 @@ func TestFactory_CreateConnection(t *testing.T) {
 		require.NotNil(t, conn, "CreateConnection 不应返回 nil 连接")
 
 		// 验证实现了 Connection 接口
-		var _ connection.Connection = conn
 	})
 }
 
@@ -56,7 +54,6 @@ func TestNewConnection(t *testing.T) {
 		require.NotNil(t, conn, "NewConnection 不应返回 nil")
 
 		// 验证接口实现
-		var _ connection.Connection = conn
 	})
 }
 

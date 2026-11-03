@@ -173,7 +173,7 @@
 - **描述**：ClickHouse 驱动未嵌入 `base.SQLConnection`，而是自建了 Query/Exec/Ping/Close，与 base 层逻辑几乎完全相同。
 - **影响**：代码重复，维护成本高。
 - **建议修复方案**：重构为嵌入 `base.SQLConnection`，仅实现 `Connect()`。
-- **修复状态**：| **验证结果**：|
+- **修复状态**：✅ 已修复（3f65f63：嵌入 base.SQLConnection，169→48 行）  **验证结果**：✅
 
 ### P2-013: 4 个数据库驱动未注册到 serve 命令
 

@@ -83,6 +83,13 @@ func (s *BatchService) ExecuteBatch(ctx context.Context, req *BatchRequest) (*Ba
 		return nil, fmt.Errorf("batch size %d exceeds maximum limit %d", len(req.Queries), s.config.MaxBatchSize)
 	}
 
+	// 应用批量执行超时配置（P2-005）
+	if s.config.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, s.config.Timeout)
+		defer cancel()
+	}
+
 	s.logger.Info("Starting batch execution",
 		zap.String("instance", req.Instance),
 		zap.Int("query_count", len(req.Queries)),
@@ -165,15 +172,33 @@ func (s *BatchService) executeBatchParallel(
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, s.config.MaxWorkers)
 
+	// StopOnError 时：首个失败后取消尚未开始的查询（P2-006）
+	batchCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	for i, sql := range req.Queries {
 		wg.Add(1)
 		go func(index int, query string) {
 			defer wg.Done()
 
-			sem <- struct{}{}
-			defer func() { <-sem }()
+			select {
+			case sem <- struct{}{}:
+				defer func() { <-sem }()
+			case <-batchCtx.Done():
+				mu.Lock()
+				results[index] = BatchResult{
+					Index:         index,
+					SQL:           query,
+					Success:       false,
+					Error:         "batch cancelled before execution",
+					ExecutionTime: 0,
+				}
+				*failureCount++
+				mu.Unlock()
+				return
+			}
 
-			result := s.executeSingleQuery(ctx, req, index, query)
+			result := s.executeSingleQuery(batchCtx, req, index, query)
 
 			mu.Lock()
 			results[index] = result
@@ -182,6 +207,9 @@ func (s *BatchService) executeBatchParallel(
 				*successCount++
 			} else {
 				*failureCount++
+				if req.StopOnError {
+					cancel()
+				}
 			}
 			mu.Unlock()
 		}(i, sql)

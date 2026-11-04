@@ -535,3 +535,89 @@ func TestBatchRequest_Structure(t *testing.T) {
 	assert.Equal(t, "tx-123", req.TransactionID)
 	assert.True(t, req.StopOnError)
 }
+
+func TestBatchService_ExecuteBatch_ParallelStopOnError(t *testing.T) {
+	logger := zap.NewNop()
+	factory := NewMockConnectionFactory()
+	// 所有连接的第 0 条 SQL 都失败
+	factory.SetFailAtIndex(0)
+
+	poolManager := pool.NewConnectionPoolManager(factory, nil)
+
+	instance := &types.DatabaseInstance{
+		Name:     "test-mysql",
+		Type:     "mysql",
+		Host:     "localhost",
+		Port:     3306,
+		Database: "testdb",
+	}
+	err := poolManager.AddInstance(instance)
+	require.NoError(t, err)
+
+	config := &BatchConfig{
+		MaxBatchSize:   100,
+		EnableParallel: true,
+		MaxWorkers:     2,
+	}
+	service := NewBatchService(nil, poolManager, config, logger)
+
+	queries := make([]string, 20)
+	for i := range queries {
+		queries[i] = "INSERT INTO users (name) VALUES ('x')"
+	}
+
+	req := &BatchRequest{
+		Instance:    "test-mysql",
+		Queries:     queries,
+		StopOnError: true,
+	}
+
+	response, err := service.ExecuteBatch(context.Background(), req)
+	require.NoError(t, err)
+
+	// 首个失败后应取消未开始的查询：成功数应远小于总数
+	assert.GreaterOrEqual(t, response.FailureCount, 1)
+	cancelled := 0
+	for _, r := range response.Results {
+		if !r.Success && r.Error == "batch cancelled before execution" {
+			cancelled++
+		}
+	}
+	assert.Greater(t, cancelled, 0, "应有查询在启动前被取消")
+	assert.Less(t, response.SuccessCount+response.FailureCount-cancelled, len(queries),
+		"实际执行的查询数应小于总数")
+}
+
+func TestBatchService_ExecuteBatch_TimeoutApplied(t *testing.T) {
+	logger := zap.NewNop()
+	factory := NewMockConnectionFactory()
+
+	poolManager := pool.NewConnectionPoolManager(factory, nil)
+
+	instance := &types.DatabaseInstance{
+		Name:     "test-mysql",
+		Type:     "mysql",
+		Host:     "localhost",
+		Port:     3306,
+		Database: "testdb",
+	}
+	err := poolManager.AddInstance(instance)
+	require.NoError(t, err)
+
+	config := &BatchConfig{
+		MaxBatchSize: 100,
+		Timeout:      50 * time.Millisecond,
+	}
+	service := NewBatchService(nil, poolManager, config, logger)
+
+	// 不依赖真实阻塞：验证超时配置不会破坏正常短查询
+	req := &BatchRequest{
+		Instance: "test-mysql",
+		Queries:  []string{"INSERT INTO users (name) VALUES ('Alice')"},
+	}
+
+	response, err := service.ExecuteBatch(context.Background(), req)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.True(t, response.Results[0].Success)
+}

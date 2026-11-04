@@ -187,6 +187,15 @@ func (c *Connection) Ping(ctx context.Context) error {
 }
 
 func (c *Connection) Close() error {
+	if c.client != nil && c.client.Transport != nil {
+		if transport, ok := c.client.Transport.(io.Closer); ok {
+			if err := transport.Close(); err != nil {
+				c.client = nil
+				c.instance.SetStatus(types.InstanceStatusUnknown)
+				return fmt.Errorf("close elasticsearch transport failed: %w", err)
+			}
+		}
+	}
 	c.client = nil
 	c.instance.SetStatus(types.InstanceStatusUnknown)
 	return nil

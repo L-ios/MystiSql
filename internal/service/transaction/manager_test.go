@@ -738,3 +738,92 @@ func TestGenerateIDs(t *testing.T) {
 	assert.NotEmpty(t, txID1)
 	assert.NotEmpty(t, connID1)
 }
+
+// instanceAwareConn 是带 Instance() 的测试连接，用于验证隔离级别 SQL 按数据库类型分派（P1-003）。
+type instanceAwareConn struct {
+	MockConnection
+	instance *types.DatabaseInstance
+	lastSQL  string
+}
+
+func (c *instanceAwareConn) Instance() *types.DatabaseInstance { return c.instance }
+
+func (c *instanceAwareConn) Exec(ctx context.Context, sql string) (*types.ExecResult, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.lastSQL = sql
+	return &types.ExecResult{}, nil
+}
+
+func TestSetIsolationLevel_DatabaseSpecificDialect(t *testing.T) {
+	logger := zap.NewNop()
+	tm := NewTransactionManager(nil, logger, nil)
+	defer tm.Close()
+
+	tests := []struct {
+		name    string
+		dbType  types.DatabaseType
+		level   types.IsolationLevel
+		wantSQL string
+		wantErr bool
+	}{
+		{
+			name:    "PostgreSQL 使用 SET SESSION CHARACTERISTICS",
+			dbType:  types.DatabaseTypePostgreSQL,
+			level:   types.IsolationLevelRepeatableRead,
+			wantSQL: "SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL REPEATABLE READ",
+		},
+		{
+			name:    "MySQL 保持 SET SESSION 语法",
+			dbType:  types.DatabaseTypeMySQL,
+			level:   types.IsolationLevelSerializable,
+			wantSQL: "SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE",
+		},
+		{
+			name:    "Oracle SERIALIZABLE 使用 ALTER SESSION",
+			dbType:  types.DatabaseTypeOracle,
+			level:   types.IsolationLevelSerializable,
+			wantSQL: "ALTER SESSION SET ISOLATION_LEVEL = SERIALIZABLE",
+		},
+		{
+			name:    "Oracle READ COMMITTED 使用 ALTER SESSION",
+			dbType:  types.DatabaseTypeOracle,
+			level:   types.IsolationLevelReadCommitted,
+			wantSQL: "ALTER SESSION SET ISOLATION_LEVEL = READ COMMITTED",
+		},
+		{
+			name:    "Oracle 不支持 REPEATABLE READ 应报错",
+			dbType:  types.DatabaseTypeOracle,
+			level:   types.IsolationLevelRepeatableRead,
+			wantErr: true,
+		},
+		{
+			name:    "未知类型回退 MySQL 语法",
+			dbType:  types.DatabaseType("clickhouse"),
+			level:   types.IsolationLevelReadCommitted,
+			wantSQL: "SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			conn := &instanceAwareConn{
+				instance: types.NewDatabaseInstance("t", tt.dbType, "h", 1),
+			}
+			tx := &Transaction{
+				ID:             "tx-test",
+				Connection:     conn,
+				IsolationLevel: tt.level,
+				State:          StateActive,
+			}
+
+			err := tm.setIsolationLevel(context.Background(), tx)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantSQL, conn.lastSQL)
+		})
+	}
+}

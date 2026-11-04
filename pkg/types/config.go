@@ -63,6 +63,14 @@ type ServerConfig struct {
 	Host string `json:"host" yaml:"host"`
 	Port int    `json:"port" yaml:"port"`
 	Mode string `json:"mode" yaml:"mode"`
+
+	// TLS 配置（可选）。CertFile 与 KeyFile 同时设置时启用 HTTPS。
+	CertFile string `json:"certFile,omitempty" yaml:"certFile,omitempty"`
+	KeyFile  string `json:"keyFile,omitempty" yaml:"keyFile,omitempty"`
+
+	// RateLimitPerMinute 每分钟每客户端最大请求数（可选）。
+	// 0 表示不启用限流；正值启用滑动窗口限流（P2-010）。
+	RateLimitPerMinute int `json:"rateLimitPerMinute,omitempty" yaml:"rateLimitPerMinute,omitempty"`
 }
 
 // HealthConfig 定义健康监控配置
@@ -99,6 +107,9 @@ type AuditConfig struct {
 	Enabled       bool   `json:"enabled" yaml:"enabled"`
 	LogFile       string `json:"logFile" yaml:"logFile"`
 	RetentionDays int    `json:"retentionDays" yaml:"retentionDays"`
+
+	// LogLevel 日志级别：all/sensitive/write/ddl，默认 all
+	LogLevel string `json:"logLevel,omitempty" yaml:"logLevel,omitempty"`
 }
 
 // ValidatorConfig 定义验证器配置

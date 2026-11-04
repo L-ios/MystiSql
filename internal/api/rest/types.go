@@ -12,6 +12,7 @@ type HealthResponse struct {
 	Status    string           `json:"status"`              // 服务状态: "healthy" 或 "unhealthy"
 	Timestamp time.Time        `json:"timestamp"`           // 时间戳
 	Version   string           `json:"version"`             // 服务版本
+	Uptime    int64            `json:"uptime"`              // 已运行秒数
 	Instances *InstancesHealth `json:"instances,omitempty"` // 实例健康状态（可选）
 }
 

@@ -23,6 +23,7 @@ type Engine struct {
 	parser           SQLParser
 	pools            map[string]connection.ConnectionPool
 	driverRegistry   *connection.DriverRegistry
+	poolConfig       *connection.PoolConfig
 	auditService     *audit.AuditService
 	validatorService *validator.ValidatorService
 	maskingService   *masking.MaskingService
@@ -42,6 +43,17 @@ func (e *Engine) SetAuditService(service *audit.AuditService) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.auditService = service
+}
+
+// SetPoolConfig 设置连接池参数（可选）。
+// 未设置时使用保守默认值。应在首次查询前调用。
+func (e *Engine) SetPoolConfig(config *connection.PoolConfig) {
+	if config == nil {
+		return
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.poolConfig = config
 }
 
 func (e *Engine) SetValidatorService(service *validator.ValidatorService) {
@@ -235,14 +247,19 @@ func (e *Engine) getConnectionPool(ctx context.Context, instanceName string) (co
 		return nil, fmt.Errorf("不支持的数据库类型: %s: %w", instance.Type, err)
 	}
 
-	// 创建连接池配置
-	config := &connection.PoolConfig{
-		MaxConnections:    10,
-		MinConnections:    2,
-		MaxIdleTime:       "30s",
-		MaxLifetime:       "1h",
-		ConnectionTimeout: "10s",
-		PingInterval:      "30s",
+	// 连接池配置：优先使用 SetPoolConfig 注入的外部配置，否则使用默认值
+	e.mu.RLock()
+	config := e.poolConfig
+	e.mu.RUnlock()
+	if config == nil {
+		config = &connection.PoolConfig{
+			MaxConnections:    10,
+			MinConnections:    2,
+			MaxIdleTime:       "30s",
+			MaxLifetime:       "1h",
+			ConnectionTimeout: "10s",
+			PingInterval:      "30s",
+		}
 	}
 
 	// 创建连接池

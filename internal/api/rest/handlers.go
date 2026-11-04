@@ -24,6 +24,7 @@ type Handlers struct {
 	validatorService *validator.ValidatorService
 	logger           *zap.Logger
 	version          string
+	startedAt        time.Time
 }
 
 // NewHandlers 创建新的处理器
@@ -34,6 +35,7 @@ func NewHandlers(registry discovery.InstanceRegistry, engine *query.Engine, vali
 		validatorService: validatorService,
 		logger:           logger,
 		version:          version,
+		startedAt:        time.Now(),
 	}
 }
 
@@ -54,6 +56,7 @@ func (h *Handlers) Health(c *gin.Context) {
 		Status:    "healthy",
 		Timestamp: time.Now(),
 		Version:   h.version,
+		Uptime:    int64(time.Since(h.startedAt).Seconds()),
 	}
 
 	// 如果需要检查实例健康状态

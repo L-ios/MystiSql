@@ -142,7 +142,7 @@ func TestConnection_EmbedsBase(t *testing.T) {
 	}
 
 	cfg := base.DefaultPoolConfig()
-	if mysqlConn.SQLConnection.Instance() != instance {
+	if mysqlConn.Instance() != instance {
 		t.Error("embedded SQLConnection should reference the same instance")
 	}
 

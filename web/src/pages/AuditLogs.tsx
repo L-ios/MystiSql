@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import {
   Card,
   Table,
@@ -40,11 +40,7 @@ export default function AuditLogs() {
   const [form] = Form.useForm()
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
 
-  useEffect(() => {
-    fetchLogs()
-  }, [pagination])
-
-  const fetchLogs = async (params?: {
+  const fetchLogs = useCallback(async (params?: {
     userId?: string
     instance?: string
     startTime?: string
@@ -70,7 +66,11 @@ export default function AuditLogs() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [pagination])
+
+  useEffect(() => {
+    fetchLogs()
+  }, [fetchLogs])
 
   const handleSearch = () => {
     const values = form.getFieldsValue()

@@ -23,6 +23,10 @@ linters:
         - -S1001
         - -S1024
         - -S1034
+  exclusions:
+    # web/node_modules 中偶有第三方内嵌 Go 文件（如 flatted），不属于本项目源码
+    paths:
+      - web/node_modules
 
 issues:
   max-same-issues: 3

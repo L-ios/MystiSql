@@ -10,6 +10,10 @@ import (
 
 	"MystiSql/internal/api/rest"
 	"MystiSql/internal/connection"
+	"MystiSql/internal/connection/clickhouse"
+	"MystiSql/internal/connection/elasticsearch"
+	"MystiSql/internal/connection/etcd"
+	"MystiSql/internal/connection/mssql"
 	"MystiSql/internal/connection/mysql"
 	"MystiSql/internal/connection/oracle"
 	"MystiSql/internal/connection/postgresql"
@@ -66,8 +70,22 @@ var serveCmd = &cobra.Command{
 		driverReg.RegisterDriver(types.DatabaseTypeOracle, oracle.NewFactory())
 		driverReg.RegisterDriver(types.DatabaseTypeRedis, redis.NewFactory())
 		driverReg.RegisterDriver(types.DatabaseTypeSQLite, sqlite.NewFactory())
+		driverReg.RegisterDriver(types.DatabaseTypeClickHouse, clickhouse.NewFactory())
+		driverReg.RegisterDriver(types.DatabaseTypeMSSQL, mssql.NewFactory())
+		driverReg.RegisterDriver(types.DatabaseTypeElasticsearch, elasticsearch.NewFactory())
+		driverReg.RegisterDriver(types.DatabaseTypeEtcd, etcd.NewFactory())
 
 		engine := query.NewEngine(GetRegistry(), driverReg)
+		// 接入全局连接池配置（若有）
+		poolConf := &connection.PoolConfig{
+			MaxConnections:    cfg.Pool.MaxConnections,
+			MinConnections:    cfg.Pool.MinConnections,
+			MaxIdleTime:       cfg.Pool.MaxIdleTime,
+			MaxLifetime:       cfg.Pool.MaxLifetime,
+			ConnectionTimeout: cfg.Pool.ConnectionTimeout,
+			PingInterval:      cfg.Pool.PingInterval,
+		}
+		engine.SetPoolConfig(poolConf)
 
 		// 创建 auth service (如果启用)
 		var authService *auth.AuthService
@@ -102,6 +120,7 @@ var serveCmd = &cobra.Command{
 				LogFile:       cfg.Audit.LogFile,
 				RetentionDays: cfg.Audit.RetentionDays,
 				BufferSize:    1000,
+				LogLevel:      cfg.Audit.LogLevel,
 			}
 			var err error
 			auditService, err = audit.NewAuditService(auditConfig, logger)

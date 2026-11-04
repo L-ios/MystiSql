@@ -115,6 +115,13 @@ export interface InstanceHealthResponse {
   timestamp: string
 }
 
+export interface ServerHealthResponse {
+  status: string
+  timestamp: string
+  version: string
+  uptime: number
+}
+
 export interface PoolStats {
   maxOpenConnections: number
   openConnections: number

@@ -3,10 +3,12 @@ package batch
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	"MystiSql/internal/connection/pool"
+	"MystiSql/internal/service/audit"
 	"MystiSql/internal/service/transaction"
 	"MystiSql/pkg/types"
 
@@ -52,6 +54,7 @@ type BatchService struct {
 	poolManager *pool.ConnectionPoolManager
 	config      *BatchConfig
 	logger      *zap.Logger
+	auditSvc    *audit.AuditService
 }
 
 func NewBatchService(txManager *transaction.TransactionManager, poolManager *pool.ConnectionPoolManager, config *BatchConfig, logger *zap.Logger) *BatchService {
@@ -65,6 +68,12 @@ func NewBatchService(txManager *transaction.TransactionManager, poolManager *poo
 		config:      config,
 		logger:      logger,
 	}
+}
+
+// SetAuditService 设置审计服务（可选）。
+// 设置后批量执行中的每条 SQL 都会记录审计日志。
+func (s *BatchService) SetAuditService(service *audit.AuditService) {
+	s.auditSvc = service
 }
 
 type BatchRequest struct {
@@ -81,6 +90,13 @@ func (s *BatchService) ExecuteBatch(ctx context.Context, req *BatchRequest) (*Ba
 
 	if len(req.Queries) > s.config.MaxBatchSize {
 		return nil, fmt.Errorf("batch size %d exceeds maximum limit %d", len(req.Queries), s.config.MaxBatchSize)
+	}
+
+	// 应用批量执行超时配置（P2-005）
+	if s.config.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, s.config.Timeout)
+		defer cancel()
 	}
 
 	s.logger.Info("Starting batch execution",
@@ -165,15 +181,33 @@ func (s *BatchService) executeBatchParallel(
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, s.config.MaxWorkers)
 
+	// StopOnError 时：首个失败后取消尚未开始的查询（P2-006）
+	batchCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	for i, sql := range req.Queries {
 		wg.Add(1)
 		go func(index int, query string) {
 			defer wg.Done()
 
-			sem <- struct{}{}
-			defer func() { <-sem }()
+			select {
+			case sem <- struct{}{}:
+				defer func() { <-sem }()
+			case <-batchCtx.Done():
+				mu.Lock()
+				results[index] = BatchResult{
+					Index:         index,
+					SQL:           query,
+					Success:       false,
+					Error:         "batch cancelled before execution",
+					ExecutionTime: 0,
+				}
+				*failureCount++
+				mu.Unlock()
+				return
+			}
 
-			result := s.executeSingleQuery(ctx, req, index, query)
+			result := s.executeSingleQuery(batchCtx, req, index, query)
 
 			mu.Lock()
 			results[index] = result
@@ -182,6 +216,9 @@ func (s *BatchService) executeBatchParallel(
 				*successCount++
 			} else {
 				*failureCount++
+				if req.StopOnError {
+					cancel()
+				}
 			}
 			mu.Unlock()
 		}(i, sql)
@@ -240,7 +277,37 @@ func (s *BatchService) executeSingleQuery(ctx context.Context, req *BatchRequest
 	}
 
 	result.ExecutionTime = time.Since(start).Milliseconds()
+
+	// 审计：每条批量 SQL 单独记录（P2-007）
+	s.logAudit(ctx, req, sql, &result)
+
 	return result
+}
+
+// logAudit 将单条批量 SQL 的执行结果写入审计日志（若已配置审计服务）。
+func (s *BatchService) logAudit(ctx context.Context, req *BatchRequest, sql string, result *BatchResult) {
+	if s.auditSvc == nil || !s.auditSvc.IsEnabled() {
+		return
+	}
+
+	auditLog := audit.NewAuditLog("batch-user", "", req.Instance, "", sql)
+	auditLog.SetQueryInfo(queryTypeOf(sql), result.RowsAffected, result.ExecutionTime)
+	if result.Success {
+		auditLog.SetSuccess()
+	} else {
+		auditLog.SetError(result.Error)
+	}
+
+	_ = s.auditSvc.Log(ctx, auditLog)
+}
+
+// queryTypeOf 从 SQL 首个单词推断语句类型（用于审计分类）。
+func queryTypeOf(sql string) string {
+	fields := strings.Fields(sql)
+	if len(fields) == 0 {
+		return ""
+	}
+	return strings.ToUpper(fields[0])
 }
 
 func (s *BatchService) ExecuteBatchWithNewTransaction(ctx context.Context, req *BatchRequest) (*BatchResponse, error) {

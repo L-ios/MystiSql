@@ -60,6 +60,21 @@ public class MystiSqlStatement implements Statement {
         
         return updateCount;
     }
+
+    /**
+     * 供子类（如 PreparedStatement）更新执行结果状态。
+     */
+    protected void setUpdateCount(int count, long largeCount) {
+        this.updateCount = count;
+        this.largeUpdateCount = largeCount;
+    }
+
+    /**
+     * 供子类（如 PreparedStatement）更新最后插入 ID。
+     */
+    protected void setLastInsertId(Long id) {
+        this.lastInsertId = id;
+    }
     
     @Override
     public boolean execute(String sql) throws SQLException {

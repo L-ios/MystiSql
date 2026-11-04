@@ -128,10 +128,16 @@ func (c *Connection) Ping(ctx context.Context) error {
 		return errors.ErrConnectionClosed
 	}
 
-	_, err := c.client.Get(ctx, "health-check-key")
+	// 使用 etcd 原生健康检查端点（维护 API），避免对用户数据产生副作用
+	host := fmt.Sprintf("%s:%d", c.instance.Host, c.instance.Port)
+	status, err := c.client.Status(ctx, host)
 	if err != nil {
 		c.instance.SetStatus(types.InstanceStatusUnhealthy)
 		return fmt.Errorf("%w: ping failed: %v", errors.ErrConnectionFailed, err)
+	}
+	if status == nil || status.Header == nil {
+		c.instance.SetStatus(types.InstanceStatusUnhealthy)
+		return fmt.Errorf("%w: invalid status response", errors.ErrConnectionFailed)
 	}
 
 	c.instance.SetStatus(types.InstanceStatusHealthy)

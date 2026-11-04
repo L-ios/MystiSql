@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   Card,
   Table,
@@ -35,11 +35,7 @@ export default function Instances() {
   const [selectedInstance, setSelectedInstance] = useState<InstanceDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
 
-  useEffect(() => {
-    fetchInstances()
-  }, [])
-
-  const fetchInstances = async () => {
+  const fetchInstances = useCallback(async () => {
     setLoading(true)
     try {
       const response = await apiClient.getInstances()
@@ -49,7 +45,11 @@ export default function Instances() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [setInstances, setLoading])
+
+  useEffect(() => {
+    fetchInstances()
+  }, [fetchInstances])
 
   const showInstanceDetail = async (name: string) => {
     setDetailLoading(true)

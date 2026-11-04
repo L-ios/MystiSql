@@ -104,11 +104,7 @@ public class MystiSqlPreparedStatement extends MystiSqlStatement implements Prep
         return request;
     }
     
-    private void setUpdateCount(int count, long largeCount) {
-    }
-    
-    private void setLastInsertId(Long id) {
-    }
+    // setUpdateCount/setLastInsertId 直接使用父类 protected 方法更新状态
     
     @Override
     public void setNull(int parameterIndex, int sqlType) throws SQLException {

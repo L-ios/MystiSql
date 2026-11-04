@@ -21,27 +21,47 @@ type LogWriter struct {
 	wg       sync.WaitGroup
 	stopCh   chan struct{}
 	mu       sync.Mutex
+
+	// fileMode 审计日志文件权限，默认 0600（仅属主可读写）
+	fileMode os.FileMode
 }
 
-func NewLogWriter(filePath string, bufferSize int, logger *zap.Logger) (*LogWriter, error) {
+// DefaultAuditFileMode 审计日志默认文件权限
+const DefaultAuditFileMode os.FileMode = 0600
+
+// WithFileMode 设置审计日志文件权限（可选）。
+func WithFileMode(mode os.FileMode) func(*LogWriter) {
+	return func(lw *LogWriter) {
+		if mode != 0 {
+			lw.fileMode = mode
+		}
+	}
+}
+
+func NewLogWriter(filePath string, bufferSize int, logger *zap.Logger, opts ...func(*LogWriter)) (*LogWriter, error) {
 	dir := filepath.Dir(filePath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create audit log directory: %w", err)
 	}
 
-	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	lw := &LogWriter{
+		filePath: filePath,
+		fileMode: DefaultAuditFileMode,
+	}
+	for _, opt := range opts {
+		opt(lw)
+	}
+
+	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, lw.fileMode)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open audit log file: %w", err)
 	}
 
-	lw := &LogWriter{
-		filePath: filePath,
-		file:     file,
-		writer:   bufio.NewWriterSize(file, 4096),
-		logger:   logger,
-		channel:  make(chan *AuditLog, bufferSize),
-		stopCh:   make(chan struct{}),
-	}
+	lw.file = file
+	lw.writer = bufio.NewWriterSize(file, 4096)
+	lw.logger = logger
+	lw.channel = make(chan *AuditLog, bufferSize)
+	lw.stopCh = make(chan struct{})
 
 	lw.wg.Add(1)
 	go lw.processLogs()
@@ -184,7 +204,7 @@ func (lw *LogWriter) Rotate() error {
 		}
 	}
 
-	file, err := os.OpenFile(lw.filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	file, err := os.OpenFile(lw.filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, lw.fileMode)
 	if err != nil {
 		return fmt.Errorf("failed to open new audit log file: %w", err)
 	}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"MystiSql/internal/service/auth"
@@ -113,11 +114,19 @@ var authRevokeCmd = &cobra.Command{
 		}
 
 		client := &http.Client{Timeout: 30 * time.Second}
-		req, err := http.NewRequest("DELETE", serverURL+"/api/v1/auth/token", nil)
+
+		// 服务端 RevokeToken handler 要求 JSON body {"token": "xxx"}
+		reqBody, err := json.Marshal(map[string]string{"token": token})
+		if err != nil {
+			return fmt.Errorf("failed to marshal request body: %w", err)
+		}
+
+		req, err := http.NewRequest("DELETE", serverURL+"/api/v1/auth/token", bytes.NewReader(reqBody))
 		if err != nil {
 			return fmt.Errorf("创建请求失败: %w", err)
 		}
 
+		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+token)
 
 		resp, err := client.Do(req)
@@ -159,7 +168,8 @@ var authInfoCmd = &cobra.Command{
 		}
 
 		client := &http.Client{Timeout: 30 * time.Second}
-		req, err := http.NewRequest("GET", serverURL+"/api/v1/auth/token/info", nil)
+		// 服务端 GetTokenInfo handler 支持 ?token= 查询参数
+		req, err := http.NewRequest("GET", serverURL+"/api/v1/auth/token/info?token="+url.QueryEscape(token), nil)
 		if err != nil {
 			return fmt.Errorf("创建请求失败: %w", err)
 		}

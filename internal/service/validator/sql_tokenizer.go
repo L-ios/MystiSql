@@ -69,7 +69,7 @@ func (t *sqlTokenizer) stripComments(sql string) string {
 		// Multi-line comment: /* ... */
 		if i+1 < n && sql[i] == '/' && sql[i+1] == '*' {
 			i += 2
-			for i+1 < n && !(sql[i] == '*' && sql[i+1] == '/') {
+			for i+1 < n && (sql[i] != '*' || sql[i+1] != '/') {
 				i++
 			}
 			if i+1 < n {
@@ -161,7 +161,7 @@ func (t *sqlTokenizer) stripStringLiterals(sql string) string {
 			// Dollar-quoted string (PostgreSQL): $$..$$
 			if i+1 < n && sql[i+1] == '$' {
 				i += 2
-				for i+1 < n && !(sql[i] == '$' && sql[i+1] == '$') {
+				for i+1 < n && (sql[i] != '$' || sql[i+1] != '$') {
 					i++
 				}
 				if i+1 < n {

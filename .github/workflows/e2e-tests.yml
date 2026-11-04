@@ -51,9 +51,11 @@ jobs:
       - name: Install Playwright browsers
         run: |
           cd web
-          npm ci
+          npm ci --foreground-scripts
           npx playwright install --with-deps chromium
-          
+        env:
+          PLAYWRIGHT_DOWNLOAD_HOST: https://playwright.azureedge.net
+        
       - name: Build MystiSql Gateway
         run: |
           go mod download

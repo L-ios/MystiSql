@@ -17,7 +17,8 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      // 优先使用 runner 预装的系统 Chrome，避免 CDN 下载.browserium
+      use: { ...devices['Desktop Chrome'], channel: 'chrome' },
     },
 
     {

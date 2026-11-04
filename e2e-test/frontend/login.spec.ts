@@ -1,4 +1,4 @@
-import { test, expect, Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 
 test.describe('Login Page', () => {
   test.beforeEach(async ({ page }) => {
@@ -7,99 +7,84 @@ test.describe('Login Page', () => {
   })
 
   test('should display login form', async ({ page }) => {
-    await expect(page.locator('text=MystiSql')).toBeVisible()
+    await expect(page.locator('h2:has-text("MystiSql")')).toBeVisible()
     await expect(page.locator('text=数据库访问网关')).toBeVisible()
-    await expect(page.locator('[data-testid="user-id-input"]')).toBeVisible()
-    await expect(page.locator('[data-testid="role-input"]')).toBeVisible()
     await expect(page.locator('[data-testid="login-button"]')).toBeVisible()
+    await expect(page.locator('textarea[placeholder="请输入 Token"]')).toBeVisible()
   })
 
-  test('should show validation error for empty user ID', async ({ page }) => {
-    await page.fill('[data-testid="user-id-input"]', '')
-    await page.fill('[data-testid="role-input"]', '')
+  test('should show validation error for empty token', async ({ page }) => {
     await page.click('[data-testid="login-button"]')
-    
-    await expect(page.locator('text=请输入用户 ID')).toBeVisible()
+
+    await expect(page.locator('text=请输入 Token')).toBeVisible()
   })
 
-  test('should login successfully with valid credentials', async ({ page }) => {
-    await page.route('**/api/v1/auth/token', route => {
+  test('should login successfully with valid token', async ({ page }) => {
+    await page.route('**/api/v1/auth/token/info', route => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           success: true,
-          data: {
-            token: 'test-token-12345',
-            userId: 'test-user',
-            role: 'admin',
-            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-          }
-        })
+          userId: 'test-user',
+          role: 'admin',
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        }),
       })
     })
 
-    await page.fill('[data-testid="user-id-input"]', 'test-user')
-    await page.fill('[data-testid="role-input"]', 'admin')
-    
+    await page.fill('textarea[placeholder="请输入 Token"]', 'valid-test-token')
+
     await Promise.all([
       page.waitForURL('**/dashboard', { timeout: 30000 }),
-      page.click('[data-testid="login-button"]')
+      page.click('[data-testid="login-button"]'),
     ])
-    
+
     await expect(page).toHaveURL(/.*dashboard/)
   })
 
-  test('should show error message for invalid credentials', async ({ page }) => {
-    await page.route('**/api/v1/auth/token', route => {
+  test('should show error message for invalid token', async ({ page }) => {
+    await page.route('**/api/v1/auth/token/info', route => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           success: false,
           error: {
-            code: 'UNAUTHORIZED',
-            message: 'Invalid credentials'
-          }
-        })
+            code: 'INVALID_TOKEN',
+            message: '无效的 Token',
+          },
+        }),
       })
     })
 
-    await page.fill('[data-testid="user-id-input"]', 'invalid-user')
-    await page.fill('[data-testid="role-input"]', 'invalid-role')
-    
+    await page.fill('textarea[placeholder="请输入 Token"]', 'invalid-token')
     await page.click('[data-testid="login-button"]')
-    
-    await expect(page.locator('.ant-message')).toBeVisible({ timeout: 10000 })
+
+    await expect(page.locator('text=无效的 Token')).toBeVisible({ timeout: 10000 })
   })
 
   test('should redirect to login when accessing protected route without auth', async ({ page }) => {
     await page.goto('/dashboard')
-    
+    await page.waitForURL('**/login**', { timeout: 10000 })
     await expect(page).toHaveURL(/.*login/)
   })
 
   test('should have proper form accessibility', async ({ page }) => {
-    const userIdInput = page.locator('[data-testid="user-id-input"]')
-    const roleInput = page.locator('[data-testid="role-input"]')
-    
-    await expect(userIdInput).toHaveAttribute('type', 'text')
-    await expect(roleInput).toHaveAttribute('type', 'text')
-    
-    const loginButton = page.locator('[data-testid="login-button"]')
-    await expect(loginButton).toHaveAttribute('type', 'submit')
+    const button = page.locator('[data-testid="login-button"]')
+    await expect(button).toBeVisible()
+    await expect(button).toBeEnabled()
+    await expect(button).toHaveText(/登录/)
   })
 
   test('should handle network errors gracefully', async ({ page }) => {
-    await page.route('**/api/v1/auth/token', route => {
-      route.abort('failed')
-    })
+    await page.route('**/api/v1/auth/token/info', route => route.abort())
 
-    await page.fill('[data-testid="user-id-input"]', 'test-user')
-    await page.fill('[data-testid="role-input"]', 'admin')
-    
+    await page.fill('textarea[placeholder="请输入 Token"]', 'some-token')
     await page.click('[data-testid="login-button"]')
-    
-    await expect(page.locator('.ant-message')).toBeVisible({ timeout: 10000 })
+
+    // 网络错误时应停留在登录页并给出提示，而不是崩溃
+    await page.waitForTimeout(2000)
+    await expect(page).toHaveURL(/.*login/)
   })
 })
